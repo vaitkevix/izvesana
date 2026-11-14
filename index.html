@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+  <meta charset="utf-8">
+  <title>Izvešanas pieteikumi</title>
+  <!-- Ietvara lapa: rāda Apps Script lietotni pa visu ekrānu, bez baltām joslām augšā un apakšā.
+       © VAITKEVIX, SIA. Visas tiesības aizsargātas. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f6b5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Izvešana">
+  <link rel="apple-touch-icon" href="icon.png">
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    body {
+      /* augšējā josla (zem pulksteņa) — zaļa; apakšējā — lietotnes fons */
+      background: linear-gradient(#0f6b5c 0, #0f6b5c env(safe-area-inset-top, 0px), #e8efe9 env(safe-area-inset-top, 0px));
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: linear-gradient(#0f6b5c 0, #0f6b5c env(safe-area-inset-top, 0px), #08100d env(safe-area-inset-top, 0px)); }
+    }
+    iframe {
+      position: fixed;
+      left: 0; right: 0;
+      top: env(safe-area-inset-top, 0px);
+      bottom: env(safe-area-inset-bottom, 0px);
+      width: 100%;
+      height: calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <iframe
+    src="https://script.google.com/macros/s/AKfycbzI_DKAaqqqVb6LfKqQ2k5Uy4EfaEuZz79NI8olYUIWcutqj30YuhYHhuh2GBKYcRt2/exec"
+    title="Izvešanas pieteikumi"
+    allow="geolocation; clipboard-write"></iframe>
+</body>
+</html>
