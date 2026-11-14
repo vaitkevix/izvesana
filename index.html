@@ -15,19 +15,16 @@
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; }
     body {
-      /* augšējā josla (zem pulksteņa) — zaļa; apakšējā — lietotnes fons */
-      background: linear-gradient(#0f6b5c 0, #0f6b5c env(safe-area-inset-top, 0px), #e8efe9 env(safe-area-inset-top, 0px));
-    }
-    @media (prefers-color-scheme: dark) {
-      body { background: linear-gradient(#0f6b5c 0, #0f6b5c env(safe-area-inset-top, 0px), #08100d env(safe-area-inset-top, 0px)); }
+      /* augšējā josla (zem pulksteņa) — zaļa; lietotne aizpilda visu pārējo līdz pašai apakšai */
+      background: #0f6b5c;
     }
     iframe {
       position: fixed;
       left: 0; right: 0;
       top: env(safe-area-inset-top, 0px);
-      bottom: env(safe-area-inset-bottom, 0px);
+      bottom: 0;
       width: 100%;
-      height: calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      height: calc(100% - env(safe-area-inset-top, 0px));
       border: 0;
     }
   </style>
