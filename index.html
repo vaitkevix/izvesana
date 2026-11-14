@@ -31,8 +31,14 @@
 </head>
 <body>
   <iframe
-    src="https://script.google.com/macros/s/AKfycbzI_DKAaqqqVb6LfKqQ2k5Uy4EfaEuZz79NI8olYUIWcutqj30YuhYHhuh2GBKYcRt2/exec"
+    id="app"
     title="Izvešanas pieteikumi"
-    allow="geolocation; clipboard-write"></iframe>
+    allow="geolocation; clipboard-write; web-share"></iframe>
+  <script>
+    // Saite ?id=TASK-... atver konkrētu pieteikumu
+    var APP = "https://script.google.com/macros/s/AKfycbzI_DKAaqqqVb6LfKqQ2k5Uy4EfaEuZz79NI8olYUIWcutqj30YuhYHhuh2GBKYcRt2/exec";
+    var id = new URLSearchParams(location.search).get("id");
+    document.getElementById("app").src = APP + (id ? "?id=" + encodeURIComponent(id) : "");
+  </script>
 </body>
 </html>
