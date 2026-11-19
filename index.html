@@ -14,6 +14,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" href="icon.png">
+  <link rel="manifest" href="manifest.json">
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; }
     body {
@@ -29,6 +30,24 @@
       height: calc(100% - env(safe-area-inset-top, 0px));
       border: 0;
     }
+    /* ===== Pievienot sākuma ekrānam (kā Aizvietošanā) ===== */
+    .a2hs{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom, 0px) + 14px);z-index:10;max-width:460px;margin:0 auto;padding:14px 14px 12px;
+      border-radius:14px;background:#fff;color:#14201d;border:1px solid rgba(15,107,92,.18);box-shadow:0 18px 40px -14px rgba(0,0,0,.45);
+      font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:a2in .3s ease-out}
+    @keyframes a2in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+    @media (prefers-color-scheme: dark){ .a2hs{background:#1b2321;color:#e8efed;border-color:rgba(255,255,255,.1)} .a2hs .x,.a2hs .btn-g{background:#26302d;color:#c5d1ce} .a2hs ol{color:#c5d1ce} .a2hs small{color:#93a39f} }
+    .a2hs .top{display:flex;gap:12px;align-items:center}
+    .a2hs img{width:46px;height:46px;border-radius:11px;flex:none;box-shadow:0 4px 10px -4px rgba(0,0,0,.3)}
+    .a2hs b{display:block;font-size:15.5px;font-weight:800}
+    .a2hs small{display:block;font-size:13px;color:#5b6b67;font-weight:600;margin-top:1px}
+    .a2hs .x{margin-left:auto;align-self:flex-start;width:30px;height:30px;border:0;border-radius:50%;background:#eef3f1;color:#5b6b67;font-size:17px;cursor:pointer;flex:none}
+    .a2hs ol{margin:12px 0 4px;padding:0 0 0 20px;font-size:14px;line-height:1.55;color:#33433f}
+    .a2hs ol b{display:inline;font-size:14px}
+    .a2hs ol svg{width:17px;height:17px;vertical-align:-3px;color:#0f6b5c}
+    .a2hs .row{display:flex;gap:8px;margin-top:12px}
+    .a2hs .row button{flex:1;min-height:44px;border-radius:10px;font:700 15px/1 inherit;font-family:inherit;cursor:pointer;border:0}
+    .a2hs .btn-g{background:#eef3f1;color:#33433f}
+    .a2hs .btn-p{background:#0f6b5c;color:#fff}
   </style>
 </head>
 <body>
@@ -41,6 +60,52 @@
     var APP = "https://script.google.com/macros/s/AKfycbzI_DKAaqqqVb6LfKqQ2k5Uy4EfaEuZz79NI8olYUIWcutqj30YuhYHhuh2GBKYcRt2/exec";
     var id = new URLSearchParams(location.search).get("id");
     document.getElementById("app").src = APP + (id ? "?id=" + encodeURIComponent(id) : "");
+
+    // ===== Pievienot sākuma ekrānam (iPhone instrukcija, Android poga) =====
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function(){});
+    var A2HS = null;
+    var LS = { get: function(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+               set: function(k, v){ try { localStorage.setItem(k, v); } catch(e){} } };
+    function isStandalone(){ return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; }
+    function isIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
+    function isMobile(){ return isIOS() || /android/i.test(navigator.userAgent); }
+    function hideA2HS(){ var b = document.getElementById("a2hs"); if (b) b.remove(); }
+    var APPWIN = null; // lietotnes logs (Apps Script iekšējais rāmis), no kura pienāca ziņa
+    function tellApp(msg){ try { if (APPWIN) APPWIN.postMessage({ izvA2hsMsg: msg }, "*"); } catch(e){} }
+    addEventListener("beforeinstallprompt", function(e){ e.preventDefault(); A2HS = e; setTimeout(function(){ maybeA2HS(); }, 4000); });
+    addEventListener("appinstalled", function(){ LS.set("izv_a2hs", "done"); hideA2HS(); tellApp("Lietotne pievienota sākuma ekrānam"); });
+    function maybeA2HS(force){
+      if (isStandalone()){ if (force) tellApp("Lietotne jau ir sākuma ekrānā"); return; }
+      if (!force){
+        if (!isMobile() || LS.get("izv_a2hs") === "done" || Date.now() - (+LS.get("izv_a2hs_later") || 0) < 5 * 864e5) return;
+        if (!isIOS() && !A2HS) return;
+        if (document.getElementById("a2hs")) return;
+      }
+      hideA2HS();
+      var share = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5"/><path d="M8 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2"/></svg>';
+      var plus = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
+      var dots = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+      var body;
+      if (A2HS) body = '<div class="row"><button class="btn-g" data-a="later">Vēlāk</button><button class="btn-p" data-a="add">Pievienot</button></div>';
+      else if (isIOS()) body = '<ol><li>Apakšā (vai augšā) spiediet ' + share + ' <b>Kopīgot</b></li><li>Izvēlieties ' + plus + ' <b>Pievienot sākuma ekrānam</b></li><li>Spiediet <b>Pievienot</b></li></ol><div class="row"><button class="btn-g" data-a="later">Sapratu</button></div>';
+      else body = '<ol><li>Pārlūkā spiediet izvēlni ' + dots + '</li><li>Izvēlieties <b>Pievienot sākuma ekrānam</b> vai <b>Instalēt lietotni</b></li></ol><div class="row"><button class="btn-g" data-a="later">Sapratu</button></div>';
+      var el = document.createElement("div"); el.className = "a2hs"; el.id = "a2hs";
+      el.innerHTML = '<div class="top"><img src="icon.png" alt=""><div><b>Ielieciet lietotni sākuma ekrānā</b><small>Atvērsiet ar vienu pieskārienu, kā parastu lietotni</small></div><button class="x" data-a="later" aria-label="Aizvērt">×</button></div>' + body;
+      document.body.appendChild(el);
+      el.onclick = function(e){
+        var t = e.target.closest("[data-a]"); if (!t) return;
+        var a = t.getAttribute("data-a");
+        if (a === "later"){ LS.set("izv_a2hs_later", String(Date.now())); hideA2HS(); return; }
+        if (a === "add" && A2HS){ var ev = A2HS; A2HS = null; hideA2HS(); ev.prompt();
+          ev.userChoice.then(function(r){ if (r.outcome === "accepted") LS.set("izv_a2hs", "done"); else LS.set("izv_a2hs_later", String(Date.now())); }).catch(function(){}); }
+      };
+    }
+    // Lietotnes palīdzības poga "Pievienot sākuma ekrānam" sūta ziņu šai lapai
+    addEventListener("message", function(e){
+      var d = e.data;
+      if (d && d.izvA2hs){ APPWIN = e.source; try { e.source.postMessage({ izvA2hsOk: 1 }, "*"); } catch(err){} maybeA2HS(true); }
+    });
+    if (isIOS()) setTimeout(function(){ maybeA2HS(); }, 6000);
   </script>
 </body>
 </html>
