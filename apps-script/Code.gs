@@ -245,7 +245,9 @@ function saveTask(taskData) {
     const ph = taskData.photos || taskData.photo;
     if (!ph || (Array.isArray(ph) && !ph.length)) return fail_('Pievienojiet bildi pirms izvešanas');
 
-    const newId = 'TASK-' + new Date().getTime();
+    // ID var atnākt no ātrās versijas (Cloudflare), lai atkārtota sūtīšana neveidotu dublikātu
+    const newId = /^TASK-\d{10,}$/.test(String(taskData.id || '')) ? String(taskData.id) : 'TASK-' + new Date().getTime();
+    if (taskData.id) { const sh0 = getSheet_(false); if (sh0 && findRow_(sh0, newId)) return withTasks_({ status: 'success', id: newId }); }
     // Bildes saglabā pirms slēdzenes — tas ir lēnākais solis
     const photoUrl = savePhotos_(taskData.photos || taskData.photo, newId, 'Pirms');
 

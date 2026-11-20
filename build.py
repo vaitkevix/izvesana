@@ -25,8 +25,14 @@ head = '''
     function call(fn, args, ok, fail, uo) {
       fetch(API + '?fn=' + encodeURIComponent(fn), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(args) })
         .then(function (r) { return r.json(); })
-        .then(function (j) { if (!j.ok) throw new Error(j.error || 'Kļūda'); if (ok) ok(j.result, uo); })
+        .then(function (j) { if (j.notices) notices(j.notices); if (!j.ok) throw new Error(j.error || 'Kļūda'); if (ok) ok(j.result, uo); })
         .catch(function (e) { if (fail) fail(e, uo); else console.error(e); });
+    }
+    // Ja Google noraidīja fonā saglabātu darbību — parāda vienreiz
+    function notices(list) {
+      var seen = {}; try { seen = JSON.parse(localStorage.getItem('izv_seen') || '{}'); } catch (e) {}
+      list.forEach(function (n) { if (seen[n.id]) return; seen[n.id] = 1; setTimeout(function () { if (window.toast) toast(n.text, 'err'); else alert(n.text); }, 800); });
+      try { localStorage.setItem('izv_seen', JSON.stringify(seen)); } catch (e) {}
     }
     function runner(ok, fail, uo) {
       return new Proxy({}, { get: function (_, name) {
