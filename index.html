@@ -2141,7 +2141,7 @@
         ? `<iframe src="https:\/\/drive.google.com/file/d/${id}/preview" title="${esc(photoName)}"></iframe>`
         : `<p>Bildi neizdevās ielādēt.<br><a href="${esc(url)}" target="_blank" rel="noopener">Atvērt jaunā cilnē</a></p>`;
     };
-    img.src = id ? 'https:\/\/drive.google.com/thumbnail?id=' + id + '&sz=w1600' : url;
+    img.src = id ? 'https://aizvietosana-api.vaitkevix.workers.dev/img?id=' + id + '&sz=w1600' : url;
   }
   function closePhoto(){
     photoCur = ''; photoSet = [];
@@ -4077,7 +4077,7 @@
     if (!u.length) return '';
     return '<div class="thumbs">' + u.map(x => {
       const id = driveId(x);
-      const src = id ? 'https:\/\/drive.google.com/thumbnail?id=' + id + '&sz=w600' : x;
+      const src = id ? 'https://aizvietosana-api.vaitkevix.workers.dev/img?id=' + id + '&sz=w600' : x;
       return `<a href="${esc(x)}" target="_blank" data-urls="${esc(u.join(' '))}" onclick="return openPhoto(event, this, '${title}')"><img loading="lazy" alt="${title}" src="${esc(src)}"></a>`;
     }).join('') + '</div>';
   }

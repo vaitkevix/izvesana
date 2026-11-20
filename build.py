@@ -43,6 +43,7 @@ head = '''
   })();
   </script>''' % API
 
+app = app.replace("'https:\\/\\/drive.google.com/thumbnail?id='", "'https://aizvietosana-api.vaitkevix.workers.dev/img?id='")
 app = re.sub(r'\s*<title>[^<]*</title>', '', app, count=1)
 app = app.replace('<meta charset="utf-8">', '<meta charset="utf-8">' + head, 1)
 
