@@ -4456,6 +4456,8 @@ window.checkCarrierPin = function () {
   });
 };
 (function () {
+  if (location.hash === '#carrier') { var st = document.createElement('style'); st.textContent = '#tabs .tab[data-tab="new-task"],#tabs .tab[data-tab="analytics"]{display:none!important}'; document.head.appendChild(st);
+    setTimeout(function () { switchTab('carrier'); if (typeof moveTabInd === 'function') moveTabInd(); }, 60); }
   var sd = window.setupDropdowns; if (sd) window.setupDropdowns = function () { var r = sd.apply(this, arguments); shxReq(SHXR.user()); return r; };
   var f = document.getElementById('taskForm'); if (f) f.addEventListener('reset', function () { setTimeout(function () { shxReq(SHXR.user()); }, 0); });
   var oh = window.openHelp; if (oh) window.openHelp = function () { oh.apply(this, arguments); SHXR.showMenu(document.querySelector('#help .help-body')); };
