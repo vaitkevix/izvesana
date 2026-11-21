@@ -3433,84 +3433,128 @@
 
 
 
-  const Xlsx = (function(){
-    const enc = new TextEncoder();
-    const T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
-    function crc32(u){ let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = T[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  // ---------------- Excel (.xlsx) — SH eksportu stils (sh-theme/eksports.md). © VAITKEVIX, SIA
+  // ExcelJS ielādē tikai eksportējot.
+  let excelJsP = null;
+  function loadExcelJS(){
+    if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+    if (excelJsP) return excelJsP;
+    return excelJsP = new Promise((ok, no) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+      s.async = true;
+      s.onload = () => window.ExcelJS ? ok(window.ExcelJS) : no(new Error('Excel bibliotēka nav pieejama'));
+      s.onerror = () => { excelJsP = null; s.remove(); no(new Error('neizdevās ielādēt Excel bibliotēku — pārbaudiet internetu')); };
+      document.head.appendChild(s);
+    });
+  }
 
-    function zip(files){
-      const parts = [], central = []; let off = 0;
-      files.forEach(f => {
-        const name = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
-        const lh = new DataView(new ArrayBuffer(30));
-        lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(10, 0, true); lh.setUint16(12, 0x21, true);
-        lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true);
-        const ch = new DataView(new ArrayBuffer(46));
-        ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(14, 0x21, true);
-        ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, name.length, true);
-        ch.setUint32(42, off, true);
-        parts.push(lh.buffer, name, data); central.push(ch.buffer, name);
-        off += 30 + name.length + data.length;
+  // sheets: [{ name, title, sub, cols:[{ h, fmt:'int'|'m3'|'date'|'datetime'|'text', wrap, min, max }], rows:[[…]], total:[…]|null, cell(c, ci, row) }]
+  async function shXlsx(fileName, docTitle, sheets){
+    const ExcelJS = await loadExcelJS();
+    const ACC = 'FFF4E4B4', INK = 'FF17201C', INK2 = 'FF4A534F', MUTED = 'FF6D7672', LINE = 'FFDFE5E2', CARD = 'FFF3F5F4';
+    const FMT = { int:'#,##0', m3:'#,##0.0#;-#,##0.0#;"–"', date:'dd.mm.yyyy', datetime:'dd.mm.yyyy hh:mm', text:'@' };
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'VAITKEVIX, SIA'; wb.company = 'SELECTUM HOME'; wb.title = docTitle;
+    wb.description = '© VAITKEVIX, SIA'; wb.created = new Date();
+    const solid = argb => ({ type:'pattern', pattern:'solid', fgColor:{ argb } });
+    const today = new Date(), dd = n => String(n).padStart(2, '0');
+    const stamp = dd(today.getDate()) + '.' + dd(today.getMonth() + 1) + '.' + today.getFullYear();
+
+    sheets.forEach(S => {
+      const n = S.cols.length, HR = 4;
+      const ws = wb.addWorksheet(S.name, {
+        views:[{ state:'frozen', ySplit:HR, showGridLines:false }],
+        pageSetup:{ paperSize:9, orientation: n > 9 ? 'landscape' : 'portrait', fitToPage:true, fitToWidth:1, fitToHeight:0,
+          margins:{ left:.5, right:.5, top:.55, bottom:.6, header:.3, footer:.3 } },
+        headerFooter:{ oddFooter:'&L&"Calibri"&8&K6D7672SELECTUM HOME · © VAITKEVIX, SIA&R&"Calibri"&8&K6D7672&P / &N' }
       });
-      const cdSize = central.reduce((s, b) => s + b.byteLength, 0);
-      const end = new DataView(new ArrayBuffer(22));
-      end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
-      end.setUint32(12, cdSize, true); end.setUint32(16, off, true);
-      return new Blob(parts.concat(central, [end.buffer]), { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    }
-    const x = s => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
-      .replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
-    const col = i => String.fromCharCode(65 + i);
+      ws.pageSetup.printTitlesRow = HR + ':' + HR;
 
-    function sheet(rows, widths, selected){
-      const body = rows.map((r, ri) => `<row r="${ri + 1}">` + r.map((c, ci) => {
-        const o = (c && typeof c === 'object') ? c : { v: c };
-        if (o.v === '' || o.v == null) return '';
-        const ref = col(ci) + (ri + 1), st = o.s ? ` s="${o.s}"` : '';
-        return typeof o.v === 'number'
-          ? `<c r="${ref}"${st}><v>${o.v}</v></c>`
-          : `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${x(o.v)}</t></is></c>`;
-      }).join('') + '</row>').join('');
-      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http:\/\/schemas.openxmlformats.org/spreadsheetml/2006/main">`
-        + `<sheetViews><sheetView workbookViewId="0"${selected ? ' tabSelected="1"' : ''}><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
-        + `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>`
-        + `<sheetData>${body}</sheetData></worksheet>`;
-    }
-    function build(sheets){
-      const H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
-      const files = [
-        { name:'[Content_Types].xml', text: H + '<Types xmlns="http:\/\/schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
-            + sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '</Types>' },
-        { name:'_rels/.rels', text: H + '<Relationships xmlns="http:\/\/schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http:\/\/schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http:\/\/schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>' },
-        { name:'docProps/core.xml', text: H + '<cp:coreProperties xmlns:cp="http:\/\/schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http:\/\/purl.org/dc/elements/1.1/"><dc:title>Izvešanas pieteikumi</dc:title><dc:creator>VAITKEVIX, SIA</dc:creator><dc:description>© VAITKEVIX, SIA. Visas tiesības aizsargātas.</dc:description></cp:coreProperties>' },
-        { name:'xl/workbook.xml', text: H + '<workbook xmlns="http:\/\/schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http:\/\/schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
-            + sheets.map((s, i) => `<sheet name="${x(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets></workbook>' },
-        { name:'xl/_rels/workbook.xml.rels', text: H + '<Relationships xmlns="http:\/\/schemas.openxmlformats.org/package/2006/relationships">'
-            + sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http:\/\/schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')
-            + `<Relationship Id="rId${sheets.length + 1}" Type="http:\/\/schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
-        { name:'xl/styles.xml', text: H + '<styleSheet xmlns="http:\/\/schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="0.0"/></numFmts>'
-            + '<fonts count="3"><font><sz val="11"/><color rgb="FF161A19"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF161A19"/><name val="Calibri"/></font><font><sz val="9"/><color rgb="FF6B7471"/><name val="Calibri"/></font></fonts>'
-            + '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF0F2F1"/><bgColor indexed="64"/></patternFill></fill></fills>'
-            + '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF0F6B5C"/></bottom><diagonal/></border><border><left/><right/><top style="thin"><color rgb="FF161A19"/></top><bottom/><diagonal/></border></borders>'
-            + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            + '<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>'
-            + '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="1" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>'
-            + '<xf numFmtId="0" fontId="1" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>' }
-      ].concat(sheets.map((s, i) => ({ name:`xl/worksheets/sheet${i + 1}.xml`, text: sheet(s.rows, s.widths, i === 0) })));
-      return zip(files);
-    }
-    return { build };
-  })();
+      // 1. rinda — nosaukums lietotnes pasteļkrāsā, 2. — apakšvirsraksts
+      ws.mergeCells(1, 1, 1, n); ws.mergeCells(2, 1, 2, n);
+      const t = ws.getCell(1, 1);
+      t.value = S.title; t.font = { name:'Calibri', size:16, bold:true, color:{ argb:INK } };
+      t.alignment = { vertical:'middle', indent:1 };
+      for (let c = 1; c <= n; c++) ws.getCell(1, c).fill = solid(ACC);
+      ws.getRow(1).height = 32;
+      const s = ws.getCell(2, 1);
+      s.value = S.sub + ' · SELECTUM HOME · sagatavots ' + stamp;
+      s.font = { name:'Calibri', size:10, color:{ argb:INK2 } }; s.alignment = { vertical:'middle', indent:1 };
+      ws.getRow(2).height = 20; ws.getRow(3).height = 8;
 
-  function exportExcel(){
+      // galvene
+      const hr = ws.getRow(HR); hr.height = 22;
+      S.cols.forEach((col, i) => {
+        const c = hr.getCell(i + 1);
+        c.value = col.h;
+        c.font = { name:'Calibri', size:10, bold:true, color:{ argb:'FFFFFFFF' } };
+        c.fill = solid(INK);
+        c.alignment = { vertical:'middle', horizontal: col.fmt && col.fmt !== 'text' && col.fmt !== 'date' && col.fmt !== 'datetime' ? 'right' : 'left', indent: 0, wrapText:false };
+      });
+
+      // dati
+      const line = { bottom:{ style:'thin', color:{ argb:LINE } } };
+      S.rows.forEach(r => {
+        const row = ws.addRow(r.map(v => v === '' || v == null ? null : v));
+        if (!S.cols.some((col, i) => col.wrap && String(r[i] || '').length > (col.max || 40))) row.height = 18;   // garam tekstam Excel pats palielina
+        S.cols.forEach((col, i) => {
+          const c = row.getCell(i + 1);
+          c.font = { name:'Calibri', size:10, color:{ argb:INK } };
+          c.border = line;
+          if (col.fmt && FMT[col.fmt] && col.fmt !== 'text') c.numFmt = FMT[col.fmt];
+          c.alignment = { vertical: col.wrap ? 'top' : 'middle', wrapText: !!col.wrap, horizontal: (col.fmt === 'int' || col.fmt === 'm3') ? 'right' : 'left' };
+          if (S.cell) S.cell(c, i, r);
+        });
+      });
+      const last = HR + S.rows.length;
+      if (S.rows.length) ws.autoFilter = { from:{ row:HR, column:1 }, to:{ row:last, column:n } };
+
+      // kopsumma
+      if (S.total){
+        const row = ws.addRow(S.total); row.height = 22;
+        S.cols.forEach((col, i) => {
+          const c = row.getCell(i + 1);
+          c.font = { name:'Calibri', size:10, bold:true, color:{ argb:INK } };
+          c.fill = solid(CARD);
+          c.border = { top:{ style:'thin', color:{ argb:INK } } };
+          if (col.fmt && FMT[col.fmt] && col.fmt !== 'text') c.numFmt = FMT[col.fmt];
+          c.alignment = { vertical:'middle', horizontal: (col.fmt === 'int' || col.fmt === 'm3') ? 'right' : 'left' };
+        });
+      }
+      ws.addRow([]);
+      const cr = ws.addRow(['SELECTUM HOME · vaitkevix.cloud/sh · © VAITKEVIX, SIA']);
+      cr.getCell(1).font = { name:'Calibri', size:9, color:{ argb:MUTED } };
+
+      // kolonnu platums pēc satura
+      S.cols.forEach((col, i) => {
+        let w = String(col.h).length + 3;
+        S.rows.concat(S.total ? [S.total] : []).forEach(r => {
+          const v = r[i];
+          const len = v == null ? 0 : v instanceof Date ? (col.fmt === 'datetime' ? 16 : 10) : typeof v === 'number' ? String(Math.round(v * 100) / 100).length + 2 : String(v).length;
+          if (len + 2 > w) w = len + 2;
+        });
+        ws.getColumn(i + 1).width = Math.max(col.min || 10, Math.min(col.max || 50, w)) + .5;   // ExcelJS izlaiž platumu 9 (noklusējums)
+      });
+    });
+
+    const buf = await wb.xlsx.writeBuffer();
+    return new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  }
+
+  // «dd.mm.yyyy[ hh:mm]» → Date (UTC, lai Excel rāda tieši to pašu laiku); citādi — teksts
+  function xlDate(s){
+    const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\.?\s+(\d{1,2}):(\d{2}))?/.exec(String(s || '').trim());
+    return m ? new Date(Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0))) : (s || '');
+  }
+
+  async function exportExcel(){
     if (!state.loaded) return toast('Dati vēl lādējas, uzgaidiet', 'err');
     const Y = state.statYear || new Date().getFullYear();
     const rows = state.tasks.map(t => ({ t, d: parseDate(t.date), k: kindOf(t) })).filter(r => r.d && r.d.y === Y);
     if (!rows.length) return toast(Y + '. gadā nav pieteikumu', 'err');
     const cap = i => MONTHS[i][0].toUpperCase() + MONTHS[i].slice(1);
     const r2 = v => Math.round(v * 100) / 100;
-    const B = v => ({ v, s: 1 }), N = v => ({ v: r2(v), s: 2 }), BN = v => ({ v: r2(v), s: 3 }), TT = v => ({ v, s: 4 });
-
 
     const mon = Array.from({ length: 12 }, () => ({ n:0, done:0, bags:0, m3:0, bagsM3:0, branchesM3:0, bioM3:0, bulkyM3:0 }));
     rows.forEach(r => {
@@ -3518,34 +3562,46 @@
       if (isDone(r.t)){ const v = num(r.t.m3Hauled); o.done++; o.m3 += v; if ((r.k + 'M3') in o) o[r.k + 'M3'] += v; }
     });
     const tot = mon.reduce((a, o) => { Object.keys(a).forEach(k => a[k] += o[k]); return a; }, { n:0, done:0, bags:0, m3:0, bagsM3:0, branchesM3:0, bioM3:0, bulkyM3:0 });
-    const s1 = [['Mēnesis','Pieteikumi','Izpildīti','Maisi (apt.)','Lapas m³','Zari m³','Bio m³','Lielgab. m³','Kopā m³'].map(B)]
-      .concat(mon.map((o, i) => [cap(i), o.n, o.done, o.bags, N(o.bagsM3), N(o.branchesM3), N(o.bioM3), N(o.bulkyM3), N(o.m3)]))
-      .concat([[TT('Kopā ' + Y), TT(tot.n), TT(tot.done), TT(tot.bags), BN(tot.bagsM3), BN(tot.branchesM3), BN(tot.bioM3), BN(tot.bulkyM3), BN(tot.m3)]]);
-
+    const I = h => ({ h, fmt:'int' }), V = h => ({ h, fmt:'m3' });
+    const s1 = {
+      name:'Pa mēnešiem', title:'Izvešanas pieteikumi · pa mēnešiem', sub: Y + '. gads',
+      cols:[{ h:'Mēnesis', fmt:'text', min:14 }, I('Pieteikumi'), I('Izpildīti'), I('Maisi (apt.)'), V('Lapas m³'), V('Zari m³'), V('Bio m³'), V('Lielgab. m³'), V('Kopā m³')],
+      rows: mon.map((o, i) => [cap(i), o.n, o.done, o.bags, r2(o.bagsM3), r2(o.branchesM3), r2(o.bioM3), r2(o.bulkyM3), r2(o.m3)]),
+      total:['Kopā ' + Y, tot.n, tot.done, tot.bags, r2(tot.bagsM3), r2(tot.branchesM3), r2(tot.bioM3), r2(tot.bulkyM3), r2(tot.m3)]
+    };
 
     const KN = { bags:'Lapas', branches:'Zari', bio:'Bio', bulky:'Lielgabarīts' };
     const sorted = rows.slice().sort((a, b) => a.d.m - b.d.m || a.d.d - b.d.d || a.t.rowIndex - b.t.rowIndex);
-    const s2 = [['Mēnesis','Datums','ID','Adrese','Pasūtītājs','Veids','Maisi (apt.)','Statuss','Izvest līdz','Izvesti m³','Komentārs','Izvedēja komentārs','Steidzami'].map(B)]
-      .concat(sorted.map(r => {
+    const ST = { 'Izpildīts':['FFD6E8E1','FF2F5D45'], 'Atcelts':['FFF3F5F4','FF6D7672'], 'Neizpildīts':['FFF4E4B4','FF6B4A00'] };
+    const s2 = {
+      name:'Pieteikumi ' + Y, title:'Izvešanas pieteikumi · ' + Y, sub: Y + '. gads · visi pieteikumi pēc datuma',
+      cols:[{ h:'Mēnesis', fmt:'text' }, { h:'Datums', fmt:'datetime' }, { h:'ID', fmt:'text' }, { h:'Adrese', fmt:'text', max:44 }, { h:'Pasūtītājs', fmt:'text', max:28 },
+        { h:'Veids', fmt:'text' }, { h:'Maisi (apt.)', fmt:'int' }, { h:'Statuss', fmt:'text' }, { h:'Izvest līdz', fmt:'date' }, V('Izvesti m³'),
+        { h:'Komentārs', fmt:'text', wrap:true, min:24, max:42 }, { h:'Izvedēja komentārs', fmt:'text', wrap:true, min:24, max:42 }, { h:'Steidzami', fmt:'text' }],
+      rows: sorted.map(r => {
         const t = r.t, bags = r.k === 'bags' ? (/^\d+$/.test(String(t.bagsEst).trim()) ? +t.bagsEst : t.bagsEst) : '';
-        return [cap(r.d.m), t.date, t.id, t.address, t.requester, KN[r.k], bags, t.status, (dueDateOf(t) ? dueText(t) + dueDateOf(t).getFullYear() : ''), isDone(t) && t.m3Hauled !== '' ? N(num(t.m3Hauled)) : '', t.comment, t.carrierComment, t.urgent ? 'Jā' : ''];
-      }));
+        const due = dueDateOf(t);
+        return [cap(r.d.m), xlDate(t.date), t.id, t.address, t.requester, KN[r.k], bags, t.status,
+          due ? new Date(Date.UTC(due.getFullYear(), due.getMonth(), due.getDate())) : '',
+          isDone(t) && t.m3Hauled !== '' ? r2(num(t.m3Hauled)) : '', t.comment, t.carrierComment, t.urgent ? 'Jā' : ''];
+      }),
+      total:null,
+      cell(c, i, r){
+        if (i === 1 && !(r[1] instanceof Date)) c.numFmt = '@';
+        if (i === 7 && ST[r[7]]){ c.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:ST[r[7]][0] } }; c.font = Object.assign({}, c.font, { bold:true, color:{ argb:ST[r[7]][1] } }); }
+        if (i === 12 && r[12]) c.font = Object.assign({}, c.font, { bold:true, color:{ argb:'FF8A2A3B' } });
+      }
+    };
 
-    const COPY = '© ' + new Date().getFullYear() + ' VAITKEVIX, SIA. Visas tiesības aizsargātas.';
-    s1.push([], [{ v: COPY, s: 6 }]); s2.push([], [{ v: COPY, s: 6 }]);
+    const btn = document.getElementById('exportBtn');
+    btn.classList.add('busy'); btn.disabled = true;
     try {
-      const blob = Xlsx.build([
-        { name:'Pa mēnešiem', rows: s1, widths:[16,12,11,13,11,11,11,13,11] },
-        { name:'Pieteikumi ' + Y, rows: s2, widths:[13,17,21,34,22,13,13,13,12,11,40,40,11] }
-      ]);
-      const url = URL.createObjectURL(blob), a = document.createElement('a');
-      a.href = url; a.download = 'Izvesanas_pieteikumi_' + Y + '_pa_menesiem.xlsx'; a.target = '_self';
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 15000);
+      const blob = await shXlsx('Izvesanas_pieteikumi_' + Y + '_pa_menesiem.xlsx', 'Izvešanas pieteikumi ' + Y, [s1, s2]);
+      downloadBlob(blob, 'Izvesanas_pieteikumi_' + Y + '_pa_menesiem.xlsx');
       toast('Excel fails lejupielādēts (' + Y + '. gads)');
     } catch(e){
       toast('Neizdevās izveidot Excel failu: ' + e.message, 'err');
-    }
+    } finally { btn.classList.remove('busy'); btn.disabled = false; }
   }
 
 

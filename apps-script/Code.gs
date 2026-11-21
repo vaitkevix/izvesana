@@ -570,33 +570,38 @@ function reportData_(year, month) {
   return out;
 }
 
+// PDF atskaite — SH eksportu stils (sh-theme/eksports.md): galvene ar SH logo, virsraksta josla sand krāsā,
+// kartītes #f3f5f4, tabulas ar tumšu galveni, kājene. Izkārtojums ar tabulām (Google PDF pārveidotājam). © VAITKEVIX, SIA
 function reportHtml_(rep) {
   const period = rep.month >= 0 ? MONTH_NAMES_[rep.month].charAt(0).toUpperCase() + MONTH_NAMES_[rep.month].slice(1) + ' ' + rep.year : rep.year + '. gads';
   const KEYS = ['bags', 'branches', 'bio', 'bulky'];
   const KIND = {
-    bags: { t: 'Lapas', c: '#d97706', s: '#f6e9d6' },
+    bags: { t: 'Lapas', c: '#b7862a', s: '#f4e4b4' },
     branches: { t: 'Zari', c: '#8b5a2b', s: '#eee5dc' },
-    bio: { t: 'Bio', c: '#16a34a', s: '#dff0e4' },
-    bulky: { t: 'Lielgabarīts', c: '#64748b', s: '#e6e9ed' }
+    bio: { t: 'Bio', c: '#2f5d45', s: '#d6e8e1' },
+    bulky: { t: 'Lielgabarīts', c: '#5c6f86', s: '#d8e6f2' }
   };
-  // SH vienotais stils — tās pašas krāsas kā lietotnē
-  const G = '#0f6b5c', INK = '#161a19', INK2 = '#4a524f', MUTED = '#6b7471', LINE = '#e3e6e5', BG = '#f3f4f3', TRACK = '#eef0ef';
+  // SH eksportu krāsas
+  const ACC = '#f4e4b4', INK = '#17201c', INK2 = '#4a534f', MUTED = '#6d7672', LINE = '#dfe5e2', CARD = '#f3f5f4', ZEBRA = '#fafbfa', GOOD = '#2f5d45';
+  const FONT = 'Manrope,-apple-system,"Segoe UI",Arial,Helvetica,sans-serif';
   const sum = () => ({ n: 0, bags: 0, branches: 0, bio: 0, bulky: 0, total: 0 });
   const add = (a, o) => { a.n += o.n; KEYS.forEach(k => a[k] += o[k]); a.total += o.total; };
   const pct = (v, max) => max > 0 ? Math.max(v > 0 ? 1.5 : 0, Math.round(v / max * 1000) / 10) : 0;
-  const cell_ = (w, color) => '<td width="' + w + '%" style="width:' + w + '%;border-top:6pt solid ' + color + ';font-size:1pt;line-height:1pt;padding:0">&nbsp;</td>';
+  const cell_ = (w, color) => '<td width="' + w + '%" style="width:' + w + '%;border-top:6px solid ' + color + ';font-size:1px;line-height:1px;padding:0">&nbsp;</td>';
   const bar = (v, max, color) => {
     const p = pct(v, max);
     return '<table class="bar"><tr>' +
       (p > 0 ? cell_(p, color) : '') +
-      (p < 100 ? cell_(100 - p, TRACK) : '') +
+      (p < 100 ? cell_(100 - p, '#ffffff') : '') +
       '</tr></table>';
   };
   const dot = c => '<span class="dot" style="color:' + c + '">●</span>';
+  const chip = k => '<span class="chip" style="background:' + KIND[k].s + '">' + KIND[k].t + '</span>';
   const card = (title, hint, body) =>
     '<table class="card"><tr><td class="ci">' +
       (title ? '<div class="ct">' + title + (hint ? ' <span class="ch">' + hint + '</span>' : '') + '</div>' : '') +
       body + '</td></tr></table>';
+  const h2 = (title, hint) => '<div class="h2">' + title + (hint ? ' <span class="ch">' + hint + '</span>' : '') + '</div>';
 
   const sh = sum(), vni = sum(), grand = sum();
   Object.keys(rep.groups.sh).forEach(a => add(sh, rep.groups.sh[a]));
@@ -606,15 +611,20 @@ function reportHtml_(rep) {
   const tz = Session.getScriptTimeZone();
   const now = new Date();
 
-  // --- augšējā josla kā lietotnē: zaļā flīze + nosaukums
+  // --- galvene: SH logo (2×2 kvadrātiņi uz tumša) + SELECTUM HOME, pa labi datums
+  const sq = c => '<td style="background:' + c + ';width:10px;height:10px;font-size:1px;line-height:1px;padding:0;border-radius:3px">&nbsp;</td>';
+  const logo = '<table class="logo"><tr><td class="lgo">' +
+    '<table class="lgi"><tr>' + sq('#d6e8e1') + '<td class="lgg"></td>' + sq('#f4e4b4') + '</tr>' +
+    '<tr><td colspan="3" class="lgh"></td></tr>' +
+    '<tr>' + sq('#d8e6f2') + '<td class="lgg"></td>' + sq('#e2ddf2') + '</tr></table></td></tr></table>';
   const head =
     '<table class="top"><tr>' +
-      '<td class="logo"><img src="https://vaitkevix.github.io/izvesana/icon-192.png" width="30" height="30"></td>' +
-      '<td class="brand"><div class="bn">Izvešanas pieteikumi</div><div class="bs">Lapas · zari · bio</div></td>' +
-      '<td class="tr"><div class="bs">Atskaite · sagatavots ' + Utilities.formatDate(now, tz, 'dd.MM.yyyy') + '</div></td>' +
+      '<td class="tl">' + logo + '</td>' +
+      '<td class="brand"><div class="bn">SELECTUM HOME</div><div class="bs">Izvešanas atskaite · lapas, zari, bio</div></td>' +
+      '<td class="tr"><div class="bd">' + Utilities.formatDate(now, tz, 'dd.MM.yyyy') + '</div><div class="bs">' + period + '</div></td>' +
     '</tr></table>' +
-    // statusa josla kā lietotnē
-    '<table class="strip"><tr>' +
+    // virsraksta josla lietotnes krāsā (sand)
+    '<table class="band"><tr>' +
       '<td class="sl"><div class="st">Izvešanas atskaite · ' + period + '</div><div class="ss">Izpildītie pieteikumi, pēc pieteikuma datuma</div></td>' +
       '<td class="sr"><span class="big">' + fmt_(grand.total) + '</span> <span class="u">m³ izvests</span></td>' +
     '</tr></table>';
@@ -623,10 +633,10 @@ function reportHtml_(rep) {
     return wrap_(head + card('', '', '<div class="empty">Šajā periodā nav izpildītu pieteikumu</div>'));
   }
 
-  // --- galvenie skaitļi: baltas kartītes, akcents tikai kopsummai
+  // --- galvenie skaitļi
   const kpi = (label, value, unit, accent) =>
-    '<td class="kpi"><div class="kl">' + label + '</div>' +
-    '<div class="kv"' + (accent ? ' style="color:' + G + '"' : '') + '>' + value + '<span class="ku">' + (unit ? ' ' + unit : '') + '</span></div></td>';
+    '<td class="kpi"' + (accent ? ' style="background:' + ACC + '"' : '') + '><div class="kl">' + label + '</div>' +
+    '<div class="kv">' + value + '<span class="ku">' + (unit ? ' ' + unit : '') + '</span></div></td>';
   const sp = rep.speedN ? rep.speedH / rep.speedN : null;
   const speedTxt = sp == null ? '–' : sp < 24 ? Math.max(1, Math.round(sp)) + ' h' : fmt_(Math.round(sp / 24 * 10) / 10) + ' d.';
   const kpis = '<table class="kpis"><tr>' +
@@ -645,14 +655,14 @@ function reportHtml_(rep) {
       '<td class="kb">' + bar(grand[k], grand.total, KIND[k].c) + '</td>' +
       '<td class="kvv">' + fmt_(grand[k]) + ' m³</td><td class="kp">' + share + '%</td></tr>';
   }).join('');
-  const split = (title, o) =>
-    '<tr><td class="split"><div class="kl">' + title + '</div><div class="sv">' + fmt_(o.total) + ' <span class="ku">m³</span></div>' +
+  const split = (title, o, lastRow) =>
+    '<tr><td class="split' + (lastRow ? ' last' : '') + '"><div class="kl">' + title + '</div><div class="sv">' + fmt_(o.total) + ' <span class="ku">m³</span></div>' +
     '<div class="sm">' + o.n + ' izvešanas · ' + (grand.total ? Math.round(o.total / grand.total * 100) : 0) + '%</div></td></tr>';
   const kindsBlock =
     '<table class="two"><tr>' +
       '<td class="col7">' + card('Pa veidiem', '', '<table class="kinds">' + kindRows + '</table>') + '</td>' +
       '<td class="gap2"></td>' +
-      '<td class="col5">' + card('Pa objektiem', '', '<table class="splits">' + split('SH objekti', sh) + split('VNĪ objekti', vni) + '</table>') + '</td>' +
+      '<td class="col5">' + card('Pa objektiem', '', '<table class="splits">' + split('SH objekti', sh) + split('VNĪ objekti', vni, true) + '</table>') + '</td>' +
     '</tr></table>';
 
   // --- pa mēnešiem (visam gadam)
@@ -664,7 +674,7 @@ function reportHtml_(rep) {
       const segs = KEYS.filter(k => m[k] > 0).map(k => cell_(pct(m[k], maxM), KIND[k].c)).join('');
       const used = KEYS.reduce((s, k) => s + (m[k] > 0 ? pct(m[k], maxM) : 0), 0);
       return '<tr><td class="mn">' + MONTH_NAMES_[i].charAt(0).toUpperCase() + MONTH_NAMES_[i].slice(1) + '</td>' +
-        '<td class="kb"><table class="bar"><tr>' + segs + (used < 100 ? cell_(Math.max(0, 100 - used), TRACK) : '') + '</tr></table></td>' +
+        '<td class="kb"><table class="bar"><tr>' + segs + (used < 100 ? cell_(Math.max(0, 100 - used), '#ffffff') : '') + '</tr></table></td>' +
         '<td class="kvv">' + fmt_(m.total) + ' m³</td><td class="kp">' + m.n + '×</td></tr>';
     }).join('');
     const legend = KEYS.filter(k => grand[k] > 0).map(k => '<span class="lg">' + dot(KIND[k].c) + KIND[k].t + '</span>').join('');
@@ -679,7 +689,7 @@ function reportHtml_(rep) {
   const topMax = top.length ? top[0].o.total : 0;
   const topBlock = card('Visvairāk izvests', 'pēc izvestajiem m³', '<table class="kinds">' + top.map((t, i) =>
     '<tr><td class="tn"><span class="rank">' + (i + 1) + '</span>' + escHtml_(t.a) + '</td>' +
-    '<td class="kb2">' + bar(t.o.total, topMax, G) + '</td>' +
+    '<td class="kb2">' + bar(t.o.total, topMax, INK) + '</td>' +
     '<td class="kvv">' + fmt_(t.o.total) + ' m³</td></tr>').join('') + '</table>');
 
   // --- tabula pa adresēm
@@ -691,78 +701,87 @@ function reportHtml_(rep) {
     const names = Object.keys(g).sort((a, b) => a.localeCompare(b, 'lv'));
     if (!names.length) return '';
     const rows = names.map((name, i) =>
-      '<tr><td class="n">' + (i + 1) + '</td><td>' + escHtml_(name) + '</td>' + cells(g[name]) + '</tr>').join('');
+      '<tr class="' + (i % 2 ? 'zb' : '') + '"><td class="n">' + (i + 1) + '</td><td>' + escHtml_(name) + '</td>' + cells(g[name]) + '</tr>').join('');
     return '<tr class="grp"><td colspan="' + (COLK.length + 4) + '">' + title +
       ' <span class="gc">' + names.length + (names.length === 1 ? ' adrese' : ' adreses') + '</span></td></tr>' + rows +
       '<tr class="sub"><td></td><td>Kopā ' + title + '</td>' + cells(s) + '</tr>';
   };
-  const th = k => '<th class="r">' + dot(KIND[k].c) + KIND[k].t + '</th>';
-  const table = '<div class="pb"></div>' + card('Pa adresēm', '', '<table class="dt"><thead><tr><th></th><th>Adrese</th><th class="r">Reizes</th>' +
-    COLK.map(th).join('') + '<th class="r">Kopā m³</th></tr></thead><tbody>' +
+  const th = k => '<th class="r">' + KIND[k].t + '</th>';
+  const table = '<div class="pb"></div>' + h2('Pa adresēm', nAddr + (nAddr === 1 ? ' adrese' : ' adreses')) +
+    '<table class="dt"><thead><tr><th class="f"></th><th>Adrese</th><th class="r">Reizes</th>' +
+    COLK.map(th).join('') + '<th class="r l">Kopā m³</th></tr></thead><tbody>' +
     section('SH objekti', rep.groups.sh, sh) + section('VNĪ objekti', rep.groups.vni, vni) +
-    '<tr class="tot"><td></td><td>Pavisam kopā</td>' + cells(grand) + '</tr></tbody></table>');
+    '<tr class="tot"><td></td><td>Pavisam kopā</td>' + cells(grand) + '</tr></tbody></table>';
 
   // --- pielikums: katrs izpildītais pieteikums ar saitēm uz bildēm
-  const KN = { bags: 'Lapas', branches: 'Zari', bio: 'Bio', bulky: 'Lielgab.' };
   const links = (arr, label) => arr.map((u, i) => '<a href="' + escHtml_(u) + '">' + label + (arr.length > 1 ? ' ' + (i + 1) : '') + '</a>').join(' ');
   const items = rep.items.slice().sort((a, b) => {
     const p = d => { const m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(d); return m ? m[3] + m[2] + m[1] : d; };
     return p(a.date) < p(b.date) ? -1 : p(a.date) > p(b.date) ? 1 : 0;
   });
-  const appendix = '<div class="newpage"></div>' + card('Izpildītie pieteikumi ar bildēm', items.length + ' pieteikumi · saites atver bildes Google Drive',
-    '<table class="dt ap"><thead><tr><th></th><th>Pieteikts</th><th>Izpildīts</th><th>Adrese</th><th>Veids</th><th class="r">m³</th><th>Bildes</th></tr></thead><tbody>' +
-    items.map((it, i) => '<tr><td class="n">' + (i + 1) + '</td><td>' + escHtml_(it.date) + '</td><td>' + (escHtml_(it.done) || '<span class="z">–</span>') + '</td><td>' + escHtml_(it.address) + '</td>' +
-      '<td>' + dot(KIND[it.kind].c) + KN[it.kind] + '</td><td class="r b">' + fmt_(it.m3) + '</td>' +
+  const appendix = '<div class="newpage"></div>' + h2('Izpildītie pieteikumi ar bildēm', items.length + ' pieteikumi · saites atver bildes Google Drive') +
+    '<table class="dt ap"><thead><tr><th class="f"></th><th>Pieteikts</th><th>Izpildīts</th><th>Adrese</th><th>Veids</th><th class="r">m³</th><th class="l">Bildes</th></tr></thead><tbody>' +
+    items.map((it, i) => '<tr class="' + (i % 2 ? 'zb' : '') + '"><td class="n">' + (i + 1) + '</td><td class="nw">' + escHtml_(it.date) + '</td><td class="nw">' + (escHtml_(it.done) || '<span class="z">–</span>') + '</td><td>' + escHtml_(it.address) + '</td>' +
+      '<td>' + chip(it.kind) + '</td><td class="r b">' + fmt_(it.m3) + '</td>' +
       '<td class="ph">' + (links(it.before, 'Pirms') || '<span class="z">nav pirms</span>') + ' &nbsp; ' + (links(it.after, 'Pēc') || '<span class="z">nav pēc</span>') + '</td></tr>').join('') +
-    '</tbody></table>');
+    '</tbody></table>';
 
   return wrap_(head + kpis + kindsBlock + monthsBlock + topBlock + table + appendix);
 
   function wrap_(inner) {
     return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
-      '@page{size:A4;margin:10mm 10mm 12mm}' +
-      'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:' + INK + ';margin:0;background:' + BG + '}' +
-      'table{border-collapse:collapse;width:100%}td,th{vertical-align:middle}' +
-      // augšējā josla
-      '.top td{padding:0 0 10pt}.logo{width:38pt}.logo img{border-radius:8pt;display:block}' +
-      '.bn{font-size:12pt;font-weight:bold;color:' + INK + '}.bs{font-size:8pt;color:' + MUTED + ';margin-top:1pt}.tr{text-align:right}' +
-      // statusa josla
-      '.strip{background:#ffffff;border:.75pt solid ' + LINE + ';border-radius:8pt}' +
-      '.strip td{padding:10pt 12pt}.sl{width:65%}.sr{width:35%;text-align:right;white-space:nowrap}' +
-      '.st{font-size:12pt;font-weight:bold}.ss{font-size:8pt;color:' + MUTED + ';margin-top:2pt}' +
-      '.big{font-size:18pt;font-weight:bold;color:' + G + '}.u{font-size:9pt;color:' + MUTED + '}' +
+      '@page{size:A4;margin:14mm}' +
+      'html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+      'body{font-family:' + FONT + ';font-size:11px;line-height:1.35;color:' + INK + ';margin:0;background:#ffffff}' +
+      'table{border-collapse:collapse;width:100%}td,th{vertical-align:middle}tr{page-break-inside:avoid;break-inside:avoid}' +
+      // galvene
+      '.top td{padding:0 0 12px}.tl{width:44px}.logo{width:34px}' +
+      '.top .lgo{background:' + INK + ';width:20px;height:22px;border-radius:9px;padding:6px 7px !important;vertical-align:middle}' +
+      '.lgi{width:20px;border-collapse:collapse}.top .lgi td{padding:0 !important}.lgg{width:2px}.top .lgh{height:2px;font-size:1px;line-height:1px}' +
+      '.bn{font-size:13px;font-weight:800;letter-spacing:-.02em;color:' + INK + '}.bs{font-size:10px;color:' + MUTED + ';margin-top:1px}' +
+      '.tr{text-align:right}.bd{font-size:12px;font-weight:700;color:' + INK + '}' +
+      // virsraksta josla
+      '.band{background:' + ACC + ';border-radius:14px}' +
+      '.band td{padding:14px 16px}.sl{width:65%}.sr{width:35%;text-align:right;white-space:nowrap}' +
+      '.st{font-size:22px;font-weight:800;letter-spacing:-.02em;color:' + INK + '}.ss{font-size:11px;color:' + INK2 + ';margin-top:3px}' +
+      '.big{font-size:24px;font-weight:800;letter-spacing:-.02em;color:' + INK + '}.u{font-size:11px;color:' + INK2 + '}' +
       // kartītes
-      '.card{background:#ffffff;border:.75pt solid ' + LINE + ';border-radius:8pt;margin-top:8pt}' +
-      '.ci{padding:10pt 12pt 12pt}.ct{font-size:10.5pt;font-weight:bold;color:' + INK + ';margin-bottom:8pt}' +
-      '.ch{font-size:8pt;font-weight:normal;color:' + MUTED + ';margin-left:6pt}' +
-      '.kpis{margin-top:8pt}.kpi{background:#ffffff;border:.75pt solid ' + LINE + ';padding:8pt 10pt 10pt;width:18.4%}.gap{width:2%}' +
-      '.kl{font-size:8pt;color:' + MUTED + '}' +
-      '.kv{font-size:15pt;font-weight:bold;margin-top:3pt;color:' + INK + '}.ku{font-size:8.5pt;font-weight:normal;color:' + MUTED + '}' +
+      '.card{background:' + CARD + ';border-radius:12px;margin-top:10px}' +
+      '.ci{padding:12px 14px 13px}.ct{font-size:12.5px;font-weight:800;letter-spacing:-.02em;color:' + INK + ';margin-bottom:8px}' +
+      '.ch{font-size:10px;font-weight:400;letter-spacing:0;color:' + MUTED + ';margin-left:6px}' +
+      '.h2{font-size:15px;font-weight:800;letter-spacing:-.02em;color:' + INK + ';margin:4px 0 8px}' +
+      '.kpis{margin-top:10px}.kpi{background:' + CARD + ';border-radius:12px;padding:10px 12px 11px;width:18.4%}.gap{width:2%}' +
+      '.kl{font-size:10px;color:' + MUTED + '}' +
+      '.kv{font-size:18px;font-weight:800;letter-spacing:-.02em;margin-top:3px;color:' + INK + '}.ku{font-size:10.5px;font-weight:400;letter-spacing:0;color:' + MUTED + '}' +
       '.two td{vertical-align:top}.col7{width:62%}.col5{width:36%}.gap2{width:2%}' +
-      '.kinds td{padding:4pt 0;border:0}.kn{width:26%;font-weight:bold}.mn{width:18%}.tn{width:44%}' +
-      '.kb{padding-right:8pt}.kb2{padding-right:8pt}' +
-      '.bar{table-layout:fixed}.bar td{height:6pt;padding:0;border:0}' +
-      '.kvv{width:17%;text-align:right;font-weight:bold;white-space:nowrap}.kp{width:9%;text-align:right;color:' + MUTED + '}' +
-      '.dot{font-size:9pt;margin-right:4pt}' +
-      '.lg{margin-left:8pt}' +
-      '.rank{display:inline-block;width:12pt;color:' + MUTED + '}' +
-      '.splits td{border:0}.split{padding:6pt 0 8pt;border-bottom:.5pt solid ' + LINE + ' !important}' +
-      '.sv{font-size:14pt;font-weight:bold;margin-top:2pt}.sm{font-size:8pt;color:' + MUTED + ';margin-top:2pt}' +
-      '.dt th{color:' + MUTED + ';font-size:8pt;font-weight:normal;padding:5pt 5pt;text-align:left;border-bottom:.75pt solid ' + LINE + '}' +
-      '.dt td{font-size:9pt;padding:4.5pt 5pt;border-bottom:.5pt solid ' + LINE + '}' +
-      '.dt tr{page-break-inside:avoid}' +
-      '.r{text-align:right !important;white-space:nowrap}.b{font-weight:bold}.z{color:#c3c8c6}.n{color:#9aa19e;width:16pt;font-size:8pt}' +
-      'tr.grp td{font-weight:bold;font-size:9.5pt;padding:10pt 5pt 5pt;background:' + BG + '}.gc{font-weight:normal;color:' + MUTED + ';font-size:8pt;margin-left:4pt}' +
-      'tr.sub td{font-weight:bold;border-bottom:.75pt solid ' + INK2 + '}' +
-      'tr.tot td{font-weight:bold;font-size:10pt;color:' + G + ';border-bottom:0;padding:8pt 5pt}' +
-      'tr.tot td.z{color:#c3c8c6}' +
-      '.empty{padding:24pt;text-align:center;color:' + MUTED + ';font-size:11pt}' +
-      '.foot{margin-top:12pt;font-size:7.5pt;color:' + MUTED + '}' +
-      '.foot b{color:' + INK2 + '}' +
-      '.newpage{page-break-before:always}.pb{height:0}.ap td{font-size:8pt;padding:3.5pt 4pt}.ap th{font-size:7.5pt}.ph a{color:' + G + ';font-weight:bold;text-decoration:none}' +
+      '.kinds td{padding:4px 0;border:0}.kn{width:26%;font-weight:700}.mn{width:18%}.tn{width:44%}' +
+      '.kb{padding-right:8px !important}.kb2{padding-right:8px !important}' +
+      '.bar{table-layout:fixed}.bar td{height:6px;padding:0;border:0}' +
+      '.kvv{width:17%;text-align:right;font-weight:700;white-space:nowrap}.kp{width:9%;text-align:right;color:' + MUTED + '}' +
+      '.dot{font-size:10px;margin-right:4px}.lg{margin-left:8px}' +
+      '.rank{display:inline-block;width:14px;color:' + MUTED + '}' +
+      '.splits td{border:0}.split{padding:6px 0 8px;border-bottom:1px solid ' + LINE + ' !important}.split.last{border-bottom:0 !important}' +
+      '.sv{font-size:17px;font-weight:800;letter-spacing:-.02em;margin-top:2px}.sm{font-size:10px;color:' + MUTED + ';margin-top:2px}' +
+      // datu tabulas
+      '.dt{border-collapse:separate;border-spacing:0;margin-top:2px}' +
+      '.dt th{background:' + INK + ';color:#ffffff;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:7px 7px;text-align:left}' +
+      '.dt th.f{border-radius:8px 0 0 8px}.dt th.l{border-radius:0 8px 8px 0}' +
+      '.dt td{font-size:11px;padding:6px 7px;border-bottom:1px solid ' + LINE + '}' +
+      '.dt tr.zb td{background:' + ZEBRA + '}' +
+      '.r{text-align:right !important;white-space:nowrap;font-variant-numeric:tabular-nums}.b{font-weight:700}.nw{white-space:nowrap}' +
+      '.z{color:#b9c0bd}.n{color:' + MUTED + ';width:18px;font-size:10px}' +
+      'tr.grp td{font-weight:800;font-size:12px;padding:12px 7px 6px;background:#ffffff;border-bottom:1px solid ' + INK + '}.gc{font-weight:400;color:' + MUTED + ';font-size:10px;margin-left:4px}' +
+      'tr.sub td{font-weight:700;background:' + CARD + '}' +
+      'tr.tot td{font-weight:800;font-size:12px;background:' + ACC + ';border-bottom:0;padding:9px 7px}' +
+      'tr.tot td:first-child{border-radius:8px 0 0 8px}tr.tot td:last-child{border-radius:0 8px 8px 0}tr.tot td.z{color:' + INK2 + '}' +
+      '.chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:700;color:' + INK + ';white-space:nowrap}' +
+      '.empty{padding:28px;text-align:center;color:' + MUTED + ';font-size:12.5px}' +
+      '.foot{margin-top:16px;border-top:1px solid ' + LINE + '}.foot td{padding-top:7px;font-size:9.5px;color:' + MUTED + '}.foot .fr{text-align:right}' +
+      '.newpage{page-break-before:always}.pb{height:12px}.ap td{font-size:10.5px;padding:5px 6px}.ap th{font-size:10px}' +
+      '.ph a{color:' + GOOD + ';font-weight:700;text-decoration:none}' +
       '</style></head><body>' + inner +
-      '<div class="foot"><b>© ' + now.getFullYear() + ' VAITKEVIX, SIA.</b> Visas tiesības aizsargātas. &nbsp;·&nbsp; ' +
-      'Izvešanas pieteikumi · dati pēc pieteikuma datuma · sagatavots ' + Utilities.formatDate(now, tz, 'dd.MM.yyyy HH:mm') + '</div>' +
+      '<table class="foot"><tr><td>SELECTUM HOME · vaitkevix.cloud/sh · Izvešanas atskaite · sagatavots ' + Utilities.formatDate(now, tz, 'dd.MM.yyyy HH:mm') + '</td>' +
+      '<td class="fr">© VAITKEVIX, SIA</td></tr></table>' +
       '</body></html>';
   }
 }
