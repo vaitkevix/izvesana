@@ -1376,7 +1376,7 @@
         <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6h11v10h-11zM13.5 9h4l3.5 3.5V16h-7.5"/><circle cx="7" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>
       </div>
       <div class="brand-text">
-        <h1>Izvešanas pieteikumi</h1>
+        <h1>Izvešana<span class="t-long">s pieteikumi</span></h1>
         <p>Lapas · zari · bio</p>
       </div>
       <div class="actions">
@@ -4390,7 +4390,7 @@
     });
     if (isIOS()) setTimeout(function(){ maybeA2HS(); }, 6000);
   </script>
-<style>#lockCard #carrierUser,#lockCard #siaDl{display:none}</style>
+<style>@media(max-width:420px){.t-long{display:none}}@media(min-width:421px){.t-short{display:none}}</style><style>#lockCard #carrierUser,#lockCard #siaDl{display:none}</style>
 <script>
 window.SHX = {
   app: 'izv', title: 'Jauns pieteikums', api: 'https://aizvietosana-api.vaitkevix.workers.dev',
