@@ -29,13 +29,8 @@ const COEF_MIXED = 0.05;    // sadzīves atkritumi lapu maisos
 const PROBLEM_REASONS = ['Nav piekļuves', 'Maisi / atkritumi nav atrasti', 'Par daudz vienai reizei', 'Laikapstākļi', 'Cits iemesls'];
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('Izvešanas pieteikumi')
-    .setFaviconUrl('https://vaitkevix.github.io/aizvietosana/icons/apps/izvesana-32.png')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
-    .addMetaTag('apple-mobile-web-app-capable', 'yes')     // pievienojot sākuma ekrānam, atveras kā lietotne bez adreses joslas
-    .addMetaTag('mobile-web-app-capable', 'yes')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  // Vecā saite slēgta: lietotne darbojas tikai portālā. HtmlService netiek lietots — tātad nav arī google.script.run.
+  return ContentService.createTextOutput('SH | Izvešana — lietotne pārcelta: https://vaitkevix.cloud/sh/#izv · © VAITKEVIX, SIA');
 }
 
 function getInitialData() {
