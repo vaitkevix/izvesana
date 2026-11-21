@@ -3582,7 +3582,7 @@
         <div class="card lock" id="lockCard">
           <div class="ic">${IC.lock}</div>
           <h3>Pieeja izvedējiem</h3>
-          <p>Ierakstiet savu uzņēmumu un paroli, lai redzētu neizpildītos pieteikumus.</p>
+          <p>Ierakstiet sava uzņēmuma (SIA) paroli, lai redzētu neizpildītos pieteikumus.</p>
           <form id="pinForm" method="post" action="#" autocomplete="on" onsubmit="event.preventDefault();checkCarrierPin()">
             <input type="text" class="input pin-user" id="carrierUser" name="username" autocomplete="username" list="siaDl" placeholder="Uzņēmums (SIA)" value="${esc(lastUser())}">
             <datalist id="siaDl">${state.sia.map(x => `<option value="${esc(x)}"></option>`).join('')}</datalist>
