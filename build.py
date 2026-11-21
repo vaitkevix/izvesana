@@ -56,6 +56,15 @@ app = app.replace('<meta charset="utf-8">', '<meta charset="utf-8">' + head, 1)
 # sākuma ekrāna piedāvājums no vecās ietvara lapas (bez iframe)
 style = re.search(r'<style>([\s\S]*?)</style>', old).group(1)
 style = style[style.index('/* ===== Pievienot'):]
+# tumšais izskats pēc SH tēmas (data-theme), nevis pēc ierīces iestatījuma
+def _dark(m):
+    out = []
+    for r in m.group(1).split('}'):
+        if not r.strip(): continue
+        sel, dec = r.split('{', 1)
+        out.append(','.join(':root[data-theme="dark"] ' + x.strip() for x in sel.split(',')) + '{' + dec + '}')
+    return ' '.join(out)
+style = re.sub(r'@media \(prefers-color-scheme: dark\)\{(.*?\})\s*\}', _dark, style, flags=re.S)
 script = re.search(r'<script>([\s\S]*?)</script>', old).group(1)
 script = script[script.index('// ===== Pievienot'):]
 app = app.replace('</body>', '<style>' + style + '</style>\n<script>' + script + '</script>\n</body>', 1)
@@ -149,5 +158,5 @@ print('SHX', ver)
 import re as _re
 _s = open('index.html', encoding='utf-8').read()
 _s = _re.sub(r'\n?<!--SH-THEME-->.*?<!--/SH-THEME-->', '', _s, flags=_re.S)
-_s = _s.replace('</head>', '\n<!--SH-THEME--><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"><link rel="stylesheet" href="sh-theme.css?v=1"><script>document.documentElement.setAttribute("data-sh","izv")</script><!--/SH-THEME-->\n</head>', 1)
+_s = _s.replace('</head>', '\n<!--SH-THEME--><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"><link rel="stylesheet" href="sh-theme.css?v=2"><script>/*SH tēma: kopīga ar portālu (sh_theme), mainās uzreiz*/(function(d){d.setAttribute("data-sh","izv");function a(t){d.setAttribute("data-theme",t==="dark"?"dark":"light")}try{a(localStorage.getItem("sh_theme"))}catch(e){}addEventListener("storage",function(e){if(e.key==="sh_theme")a(e.newValue)});addEventListener("message",function(e){var m=e.data;if(e.origin===location.origin&&m&&m.sh==="theme")a(m.t)})})(document.documentElement)</script><!--/SH-THEME-->\n</head>', 1)
 open('index.html', 'w', encoding='utf-8').write(_s)

@@ -1366,7 +1366,7 @@
     }
   </style>
 
-<!--SH-THEME--><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"><link rel="stylesheet" href="sh-theme.css?v=1"><script>document.documentElement.setAttribute("data-sh","izv")</script><!--/SH-THEME-->
+<!--SH-THEME--><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"><link rel="stylesheet" href="sh-theme.css?v=2"><script>/*SH tēma: kopīga ar portālu (sh_theme), mainās uzreiz*/(function(d){d.setAttribute("data-sh","izv");function a(t){d.setAttribute("data-theme",t==="dark"?"dark":"light")}try{a(localStorage.getItem("sh_theme"))}catch(e){}addEventListener("storage",function(e){if(e.key==="sh_theme")a(e.newValue)});addEventListener("message",function(e){var m=e.data;if(e.origin===location.origin&&m&&m.sh==="theme")a(m.t)})})(document.documentElement)</script><!--/SH-THEME-->
 </head>
 <body>
 <canvas id="leaves"></canvas>
@@ -1376,7 +1376,7 @@
   <div class="topbar-inner">
     <div class="brand-row">
       <div class="logo">
-        <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6h11v10h-11zM13.5 9h4l3.5 3.5V16h-7.5"/><circle cx="7" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 16.5V6H2.5v10.5h2"/><path d="M14 9.5h4l3.5 4v3h-2"/><path d="M9.3 16.5h5.4"/><circle cx="7" cy="16.8" r="2.3"/><circle cx="17" cy="16.8" r="2.3"/></svg>
       </div>
       <div class="brand-text">
         <h1>Izvešana<span class="t-long">s pieteikumi</span></h1>
@@ -1879,14 +1879,13 @@
 
   (function initTheme(){
     let t = null;
-    try { t = localStorage.getItem('theme'); } catch(e){}
-    if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', t);
+    try { t = localStorage.getItem('sh_theme'); } catch(e){}   // kopīga ar SH portālu; bez atslēgas — gaišā
+    document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
   })();
   function toggleTheme(){
     const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', t);
-    try { localStorage.setItem('theme', t); } catch(e){}
+    try { localStorage.setItem('sh_theme', t); } catch(e){}
   }
 
 
@@ -4333,7 +4332,7 @@
       border-radius:14px;background:#fff;color:#14201d;border:1px solid rgba(15,107,92,.18);box-shadow:0 18px 40px -14px rgba(0,0,0,.45);
       font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:a2in .3s ease-out}
     @keyframes a2in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-    @media (prefers-color-scheme: dark){ .a2hs{background:#1b2321;color:#e8efed;border-color:rgba(255,255,255,.1)} .a2hs .x,.a2hs .btn-g{background:#26302d;color:#c5d1ce} .a2hs ol{color:#c5d1ce} .a2hs small{color:#93a39f} }
+    :root[data-theme="dark"] .a2hs{background:#1b2321;color:#e8efed;border-color:rgba(255,255,255,.1)} :root[data-theme="dark"] .a2hs .x,:root[data-theme="dark"] .a2hs .btn-g{background:#26302d;color:#c5d1ce} :root[data-theme="dark"] .a2hs ol{color:#c5d1ce} :root[data-theme="dark"] .a2hs small{color:#93a39f}
     .a2hs .top{display:flex;gap:12px;align-items:center}
     .a2hs img{width:46px;height:46px;border-radius:11px;flex:none;box-shadow:0 4px 10px -4px rgba(0,0,0,.3)}
     .a2hs b{display:block;font-size:15.5px;font-weight:800}
