@@ -177,6 +177,13 @@ function login_(pin) {
   return row && row.pass && pass === row.pass ? { sia: row.name } : null;
 }
 
+/** Pieslēgšanās tikai ar paroli: atgriež SIA nosaukumu, ja parole ir unikāla */
+function carrierByPassword(pw) {
+  const p = String(pw == null ? '' : pw).trim().toUpperCase(); if (!p) return '';
+  const m = siaLogins_().filter(x => x.pass && x.pass === p);
+  if (m.length === 1) return m[0].name;
+  Utilities.sleep(800); return '';
+}
 function siaLogins_() {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('SIA');
   if (!sh || sh.getLastRow() < 2) return [];
@@ -1054,11 +1061,11 @@ function aiTest() {
 //  Script properties: BRIDGE_KEY (tā pati atslēga, kas Cloudflare).
 // ================================================================
 const BRIDGE_FNS_ = ['getBoot', 'getTasks', 'getInitialData', 'saveTask', 'updateTask', 'setTaskCancelled', 'getAccess', 'checkCarrierPin', 'completeTask',
-  'reportProblem', 'reportPdf', 'geocodeAddresses', 'aiParseMessage', 'aiCheckPhoto', 'aiCompare', 'aiAsk', 'aiMonthSummary', 'saveFileToDrive'];
+  'reportProblem', 'reportPdf', 'geocodeAddresses', 'aiParseMessage', 'aiCheckPhoto', 'aiCompare', 'aiAsk', 'aiMonthSummary', 'saveFileToDrive', 'carrierByPassword'];
 const BRIDGE_MAP_ = { getBoot: getBoot, getTasks: getTasks, getInitialData: getInitialData, saveTask: saveTask, updateTask: updateTask, setTaskCancelled: setTaskCancelled,
   getAccess: getAccess, checkCarrierPin: checkCarrierPin, completeTask: completeTask, reportProblem: reportProblem, reportPdf: reportPdf,
   geocodeAddresses: geocodeAddresses, aiParseMessage: aiParseMessage, aiCheckPhoto: aiCheckPhoto, aiCompare: aiCompare, aiAsk: aiAsk,
-  aiMonthSummary: aiMonthSummary, saveFileToDrive: saveFileToDrive };
+  aiMonthSummary: aiMonthSummary, saveFileToDrive: saveFileToDrive, carrierByPassword: carrierByPassword };
 
 function doPost(e) {
   const out = (o) => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);

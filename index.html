@@ -4390,5 +4390,71 @@
     });
     if (isIOS()) setTimeout(function(){ maybeA2HS(); }, 6000);
   </script>
+<script>
+window.SHX = {
+  app: 'izv', title: 'SH | Izvešanas pieteikumi', api: 'https://aizvietosana-api.vaitkevix.workers.dev',
+  sub: 'Ievadiet savu PIN kodu vai SIA paroli',
+  hint: 'Pieteicēji — tas pats PIN, kas Aizvietošanā. Izvedēji — savas SIA parole.',
+  tabSel: '#tabs .tab',
+  tabsFor: function (u) { return u.kind === 'admin' ? ['new-task', 'task-list', 'carrier', 'analytics'] : u.kind === 'izvedejs' ? ['carrier', 'task-list'] : ['new-task', 'task-list', 'analytics']; },
+  homeTab: function (u) { return u.kind === 'izvedejs' ? 'carrier' : 'new-task'; },
+  switchTab: function (t) { switchTab(t); },
+  closeMenu: function () { closeHelp(); },
+  a2hs: function () { a2hsAsk(); },
+  onUser: function (u, fresh) {
+    if (u.kind === 'izvedejs' && u.carrierPin) {
+      try { localStorage.setItem('carrierPin', u.carrierPin); localStorage.setItem('carrierUser', u.name); } catch (e) {}
+      if (state.pin !== u.carrierPin) { state.pin = u.carrierPin; state.unlocked = true; state.access = null; try { renderCarrierList(); } catch (e) {} }
+      if (state.tab !== 'carrier') switchTab('carrier');
+    }
+    if (u.kind === 'pieteicejs' || u.kind === 'admin') shxReq(u);
+    if (typeof moveTabInd === 'function') setTimeout(moveTabInd, 50);
+  },
+  onOut: function (u) { if (u && u.kind === 'izvedejs') try { lockCarrier(); } catch (e) {} },
+  tours: {
+    pieteicejs: [
+      { title: 'Sveiki!', text: 'Īsa pamācība, kā pieteikt izvešanu. Aizņems pusminūti.' },
+      { sel: '#tabs', title: 'Cilnes', text: 'Jauns — pieteikt izvešanu. Saraksts — visi pieteikumi un to statuss. Statistika — kopsavilkums.' },
+      { sel: '#aiMsgBtn', tab: 'new-task', title: 'Pieteikt ar AI', text: 'Ielīmējiet vai nodiktējiet ziņu — forma aizpildīsies pati.' },
+      { sel: '#dz-new', tab: 'new-task', title: 'Bilde pirms', text: 'Nofotografējiet, kas jāizved. Bilde ir obligāta, datums un adrese uzliksies pati.' },
+      { sel: '#addrCombo', tab: 'new-task', title: 'Adrese', text: 'Sāciet rakstīt adresi vai izvēlieties tuvāko. Nesen lietotās ir zem lauka.' },
+      { sel: '#requester', tab: 'new-task', title: 'Pasūtītājs', text: 'Jūsu vārds ir aizpildīts automātiski.' },
+      { sel: '#kindSeg', tab: 'new-task', title: 'Ko izvest', text: 'Lapas, zari vai bio. Lapām norādiet aptuveno maisu skaitu.' },
+      { sel: 'label:has(#urgent), #urgent', tab: 'new-task', title: 'Steidzami', text: 'Ieslēdziet, ja vajag ātri — izvedējs to redzēs saraksta augšā.' },
+      { sel: '#submitBtn', tab: 'new-task', title: 'Nosūtīt', text: 'Pieteikums saglabājas uzreiz, arī ar vāju internetu.' },
+      { sel: '#searchInput', tab: 'task-list', title: 'Saraksts', text: 'Meklējiet pēc adreses, pasūtītāja vai ID un sekojiet statusam.' },
+      { sel: '.help-btn', tab: 'new-task', title: 'Izvēlne', text: 'Šeit ir pamācība, pievienošana sākuma ekrānam un iziešana.' },
+      { title: 'Viss gatavs!', text: 'Veiksmīgu darbu!' }
+    ],
+    izvedejs: [
+      { title: 'Sveiki!', text: 'Īsa pamācība izvedējam. Aizņems pusminūti.' },
+      { sel: '#carrierContainer', tab: 'carrier', title: 'Jūsu darbi', text: 'Šeit ir visi neizpildītie pieteikumi. Steidzamie — augšā.' },
+      { sel: '#carrierContainer .card, #carrierContainer', tab: 'carrier', title: 'Atzīmēt izpildītu', text: 'Atveriet pieteikumu, pievienojiet bildi pēc un norādiet apjomu, tad spiediet Izpildīts.' },
+      { sel: '[data-tab="task-list"]', title: 'Saraksts', text: 'Visi pieteikumi un to vēsture.' },
+      { sel: '.help-btn', tab: 'carrier', title: 'Izvēlne', text: 'Pamācība, pievienošana sākuma ekrānam un iziešana.' },
+      { title: 'Viss gatavs!', text: 'Veiksmīgu darbu!' }
+    ]
+  }
+};
+window.SHX.tours.admin = window.SHX.tours.pieteicejs.slice(0, -2).concat([
+  { sel: '[data-tab="carrier"]', title: 'Izvedējs', text: 'Izvedēju skats — atzīmē izpildītos pieteikumus.' },
+  { sel: '[data-tab="analytics"]', title: 'Statistika', text: 'Kopsavilkums pa mēnešiem un izvedējiem.' }
+]).concat(window.SHX.tours.pieteicejs.slice(-2));
+/* Pasūtītāja vārds no PIN: atrod sarakstā (arī ar uzvārdu), vadītājam nomaināms nav */
+function shxReq(u) {
+  var sel = document.getElementById('requester'); if (!sel) return;
+  var n = String(u.name || '').toLowerCase(), opts = [].slice.call(sel.options);
+  var o = opts.find(function (x) { return x.value.toLowerCase() === n; }) || opts.find(function (x) { return x.value && x.value.toLowerCase().indexOf(n) === 0; });
+  if (!o && sel.options.length > 1) { o = new Option(u.name, u.name); sel.add(o); }
+  if (o) sel.value = o.value;
+  sel.disabled = u.kind !== 'admin' && !!o;
+}
+(function () {
+  var sd = window.setupDropdowns; if (sd) window.setupDropdowns = function () { var r = sd.apply(this, arguments); var u = window.SHXR && SHXR.user(); if (u && u.kind !== 'izvedejs') shxReq(u); return r; };
+  var f = document.getElementById('taskForm'); if (f) f.addEventListener('reset', function () { setTimeout(function () { var u = window.SHXR && SHXR.user(); if (u && u.kind !== 'izvedejs') shxReq(u); }, 0); });
+  var oh = window.openHelp; if (oh) window.openHelp = function () { oh.apply(this, arguments); SHXR.showMenu(document.querySelector('#help .help-body')); };
+})();
+</script>
+<script src="sh-addon.js?v=76f3547e"></script>
 </body>
 </html>
