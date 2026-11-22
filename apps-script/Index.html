@@ -2102,7 +2102,7 @@
     img.onerror = () => {
       if (photoCur !== url) return;
 
-      body.innerHTML = id
+      body.innerHTML = id && !/^r2-/.test(id)
         ? `<iframe src="https:\/\/drive.google.com/file/d/${id}/preview" title="${esc(photoName)}"></iframe>`
         : `<p>Bildi neizdevās ielādēt.<br><a href="${esc(url)}" target="_blank" rel="noopener">Atvērt jaunā cilnē</a></p>`;
     };
@@ -3409,7 +3409,7 @@
   async function shXlsx(fileName, docTitle, sheets){
     const ExcelJS = await loadExcelJS();
     const ACC = 'FFF4E4B4', INK = 'FF17201C', INK2 = 'FF4A534F', MUTED = 'FF6D7672', LINE = 'FFDFE5E2', CARD = 'FFF3F5F4';
-    const FMT = { int:'#,##0', m3:'#,##0.0#;-#,##0.0#;"–"', date:'dd.mm.yyyy', datetime:'dd.mm.yyyy hh:mm', text:'@' };
+    const FMT = { int:'#,##0', m3:'#,##0.0#;-#,##0.0#;"–"', eur:'#,##0.00 "€";-#,##0.00 "€";"–"', date:'dd.mm.yyyy', datetime:'dd.mm.yyyy hh:mm', text:'@' };
     const wb = new ExcelJS.Workbook();
     wb.creator = 'VAITKEVIX, SIA'; wb.company = 'SELECTUM HOME'; wb.title = docTitle;
     wb.description = '© VAITKEVIX, SIA'; wb.created = new Date();
@@ -3459,7 +3459,7 @@
           c.font = { name:'Calibri', size:10, color:{ argb:INK } };
           c.border = line;
           if (col.fmt && FMT[col.fmt] && col.fmt !== 'text') c.numFmt = FMT[col.fmt];
-          c.alignment = { vertical: col.wrap ? 'top' : 'middle', wrapText: !!col.wrap, horizontal: (col.fmt === 'int' || col.fmt === 'm3') ? 'right' : 'left' };
+          c.alignment = { vertical: col.wrap ? 'top' : 'middle', wrapText: !!col.wrap, horizontal: (col.fmt === 'int' || col.fmt === 'm3' || col.fmt === 'eur') ? 'right' : 'left' };
           if (S.cell) S.cell(c, i, r);
         });
       });
@@ -3475,7 +3475,7 @@
           c.fill = solid(CARD);
           c.border = { top:{ style:'thin', color:{ argb:INK } } };
           if (col.fmt && FMT[col.fmt] && col.fmt !== 'text') c.numFmt = FMT[col.fmt];
-          c.alignment = { vertical:'middle', horizontal: (col.fmt === 'int' || col.fmt === 'm3') ? 'right' : 'left' };
+          c.alignment = { vertical:'middle', horizontal: (col.fmt === 'int' || col.fmt === 'm3' || col.fmt === 'eur') ? 'right' : 'left' };
         });
       }
       ws.addRow([]);
@@ -3504,6 +3504,8 @@
     return m ? new Date(Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0))) : (s || '');
   }
 
+  // Cenas (agrāk formulas tabulā «Izvešana · Pieteikumi» M–P): izmaksas 13,5 €/m³, cena 15 €/m³ bez PVN, PVN 21 %. © VAITKEVIX, SIA
+  const IZV_RATES = { cost: 13.5, price: 15, vat: 0.21 };
   async function exportExcel(){
     if (!state.loaded) return toast('Dati vēl lādējas, uzgaidiet', 'err');
     const Y = state.statYear || new Date().getFullYear();
@@ -3533,13 +3535,15 @@
       name:'Pieteikumi ' + Y, title:'Izvešanas pieteikumi · ' + Y, sub: Y + '. gads · visi pieteikumi pēc datuma',
       cols:[{ h:'Mēnesis', fmt:'text' }, { h:'Datums', fmt:'datetime' }, { h:'ID', fmt:'text' }, { h:'Adrese', fmt:'text', max:44 }, { h:'Pasūtītājs', fmt:'text', max:28 },
         { h:'Veids', fmt:'text' }, { h:'Maisi (apt.)', fmt:'int' }, { h:'Statuss', fmt:'text' }, { h:'Izvest līdz', fmt:'date' }, V('Izvesti m³'),
-        { h:'Komentārs', fmt:'text', wrap:true, min:24, max:42 }, { h:'Izvedēja komentārs', fmt:'text', wrap:true, min:24, max:42 }, { h:'Steidzami', fmt:'text' }],
+        { h:'Komentārs', fmt:'text', wrap:true, min:24, max:42 }, { h:'Izvedēja komentārs', fmt:'text', wrap:true, min:24, max:42 }, { h:'Steidzami', fmt:'text' },
+        { h:'Izvedējs (SIA)', fmt:'text', max:28 }, { h:'Izmaksas', fmt:'eur' }, { h:'bez PVN', fmt:'eur' }, { h:'Ar PVN', fmt:'eur' }, { h:'Starpsumma', fmt:'eur' }],
       rows: sorted.map(r => {
         const t = r.t, bags = r.k === 'bags' ? (/^\d+$/.test(String(t.bagsEst).trim()) ? +t.bagsEst : t.bagsEst) : '';
-        const due = dueDateOf(t);
+        const due = dueDateOf(t), m3 = isDone(t) && t.m3Hauled !== '' ? r2(num(t.m3Hauled)) : '';
+        const c = m3 === '' ? ['', '', '', ''] : [r2(m3 * IZV_RATES.cost), r2(m3 * IZV_RATES.price), r2(m3 * IZV_RATES.price * (1 + IZV_RATES.vat)), r2(m3 * (IZV_RATES.price - IZV_RATES.cost))];
         return [cap(r.d.m), xlDate(t.date), t.id, t.address, t.requester, KN[r.k], bags, t.status,
           due ? new Date(Date.UTC(due.getFullYear(), due.getMonth(), due.getDate())) : '',
-          isDone(t) && t.m3Hauled !== '' ? r2(num(t.m3Hauled)) : '', t.comment, t.carrierComment, t.urgent ? 'Jā' : ''];
+          m3, t.comment, t.carrierComment, t.urgent ? 'Jā' : '', isDone(t) ? t.sia : ''].concat(c);
       }),
       total:null,
       cell(c, i, r){
@@ -3549,6 +3553,8 @@
       }
     };
 
+    { const sm = i => r2(s2.rows.reduce((a, r) => a + (typeof r[i] === 'number' ? r[i] : 0), 0));
+      s2.total = ['Kopā ' + Y, '', '', '', '', '', '', '', '', sm(9), '', '', '', '', sm(14), sm(15), sm(16), sm(17)]; }
     const btn = document.getElementById('exportBtn');
     btn.classList.add('busy'); btn.disabled = true;
     try {
@@ -3577,6 +3583,7 @@
       .withSuccessHandler(res => {
         done();
         if (!res || res.status !== 'success') return toast('Kļūda: ' + ((res && res.message) || 'nezināma kļūda'), 'err');
+        if (res.html) { printHtml(res.html); return toast(res.count ? 'Atskaite atvērta — drukā izvēlieties «Saglabāt kā PDF»' : 'Šajā periodā nav izpildītu pieteikumu'); }
         try {
           const bin = atob(res.b64), u = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
@@ -3586,6 +3593,15 @@
       })
       .withFailureHandler(err => { done(); toast('Kļūda: ' + err.message, 'err'); })
       .reportPdf(Y, M === 'all' ? -1 : +M);
+  }
+
+  // Atskaite (HTML no Cloudflare) → pārlūka drukas logs, kur var «Saglabāt kā PDF». © VAITKEVIX, SIA
+  function printHtml(html){
+    const old = document.getElementById('printFrame'); if (old) old.remove();
+    const f = document.createElement('iframe'); f.id = 'printFrame';
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch(e){ const w = window.open('', '_blank'); if (w){ w.document.write(html); w.document.close(); } } };
+    document.body.appendChild(f); f.srcdoc = html;
   }
 
   let addrTimer;

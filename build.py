@@ -19,7 +19,7 @@ head = '''
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://aizvietosana-api.vaitkevix.workers.dev">
   <script>
-  /* Ātrā versija: google.script.run → Cloudflare (Google tabula paliek galvenā). © VAITKEVIX, SIA */
+  /* Ātrā versija: google.script.run → Cloudflare (dati Cloudflare D1, bez Google). © VAITKEVIX, SIA */
   (function () {
     var API = '%s';
     function call(fn, args, ok, fail, uo) {
