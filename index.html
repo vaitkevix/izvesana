@@ -14,11 +14,11 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" href="icon.png">
   <link rel="manifest" href="manifest.json">
-  <link rel="preconnect" href="https://aizvietosana-api.vaitkevix.workers.dev">
+  <link rel="preconnect" href="https://vaitkevix.cloud/sh/api">
   <script>
   /* Ātrā versija: google.script.run → Cloudflare (dati Cloudflare D1, bez Google). © VAITKEVIX, SIA */
   (function () {
-    var API = 'https://aizvietosana-api.vaitkevix.workers.dev/izv';
+    var API = 'https://vaitkevix.cloud/sh/api/izv';
     function call(fn, args, ok, fail, uo) {
       var t = ''; try { t = localStorage.getItem('sh_t') || ''; } catch (e) {}   // portāla sesija — mainīt var tikai ielogojies
       fetch(API + '?fn=' + encodeURIComponent(fn) + (t ? '&t=' + encodeURIComponent(t) : ''), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(args) })
@@ -2150,7 +2150,7 @@
         ? `<iframe src="https:\/\/drive.google.com/file/d/${id}/preview" title="${esc(photoName)}"></iframe>`
         : `<p>Bildi neizdevās ielādēt.<br><a href="${esc(url)}" target="_blank" rel="noopener">Atvērt jaunā cilnē</a></p>`;
     };
-    img.src = id ? 'https://aizvietosana-api.vaitkevix.workers.dev/img?id=' + id + '&sz=w1600' : url;
+    img.src = id ? 'https://vaitkevix.cloud/sh/api/img?id=' + id + '&sz=w1600' : url;
   }
   function closePhoto(){
     photoCur = ''; photoSet = [];
@@ -4158,7 +4158,7 @@
     if (!u.length) return '';
     return '<div class="thumbs">' + u.map(x => {
       const id = driveId(x);
-      const src = id ? 'https://aizvietosana-api.vaitkevix.workers.dev/img?id=' + id + '&sz=w600' : x;
+      const src = id ? 'https://vaitkevix.cloud/sh/api/img?id=' + id + '&sz=w600' : x;
       return `<a href="${esc(x)}" target="_blank" data-urls="${esc(u.join(' '))}" onclick="return openPhoto(event, this, '${title}')"><img loading="lazy" alt="${title}" src="${esc(src)}"></a>`;
     }).join('') + '</div>';
   }
@@ -4468,7 +4468,7 @@
 <style>@media(max-width:420px){.t-long{display:none}}@media(min-width:421px){.t-short{display:none}}</style><style>#lockCard #carrierUser,#lockCard #siaDl{display:none}</style>
 <script>
 window.SHX = {
-  app: 'izv', title: 'Jauns pieteikums', api: 'https://aizvietosana-api.vaitkevix.workers.dev',
+  app: 'izv', title: 'Jauns pieteikums', api: 'https://vaitkevix.cloud/sh/api',
   sub: 'Lai pieteiktu, ievadiet savu PIN kodu', hint: 'Tas pats PIN, kas Aizvietošanā.',
   gateIn: '#new-task',
   homeTab: function (k) { return k === 'izvedejs' ? 'carrier' : 'new-task'; },

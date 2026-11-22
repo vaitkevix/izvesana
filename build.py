@@ -3,7 +3,7 @@
 import re
 app = open('apps-script/Index.html', encoding='utf-8').read()
 old = open('apps-script/wrapper-old.html', encoding='utf-8').read()
-API = 'https://aizvietosana-api.vaitkevix.workers.dev/izv'
+API = 'https://vaitkevix.cloud/sh/api/izv'
 
 head = '''
   <title>SH | Izvešanas pieteikumi</title>
@@ -17,7 +17,7 @@ head = '''
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" href="icon.png">
   <link rel="manifest" href="manifest.json">
-  <link rel="preconnect" href="https://aizvietosana-api.vaitkevix.workers.dev">
+  <link rel="preconnect" href="https://vaitkevix.cloud/sh/api">
   <script>
   /* Ātrā versija: google.script.run → Cloudflare (dati Cloudflare D1, bez Google). © VAITKEVIX, SIA */
   (function () {
@@ -50,7 +50,7 @@ head = '''
   })();
   </script>''' % API
 
-app = app.replace("'https:\\/\\/drive.google.com/thumbnail?id='", "'https://aizvietosana-api.vaitkevix.workers.dev/img?id='")
+app = app.replace("'https:\\/\\/drive.google.com/thumbnail?id='", "'https://vaitkevix.cloud/sh/api/img?id='")
 app = re.sub(r'\s*<title>[^<]*</title>', '', app, count=1)
 app = app.replace('<meta charset="utf-8">', '<meta charset="utf-8">' + head, 1)
 
@@ -79,7 +79,7 @@ ver = hashlib.sha1(addon.encode()).hexdigest()[:8]
 shx = '''<style>@media(max-width:420px){.t-long{display:none}}@media(min-width:421px){.t-short{display:none}}</style><style>#lockCard #carrierUser,#lockCard #siaDl{display:none}</style>
 <script>
 window.SHX = {
-  app: 'izv', title: 'Jauns pieteikums', api: 'https://aizvietosana-api.vaitkevix.workers.dev',
+  app: 'izv', title: 'Jauns pieteikums', api: 'https://vaitkevix.cloud/sh/api',
   sub: 'Lai pieteiktu, ievadiet savu PIN kodu', hint: 'Tas pats PIN, kas Aizvietošanā.',
   gateIn: '#new-task',
   homeTab: function (k) { return k === 'izvedejs' ? 'carrier' : 'new-task'; },

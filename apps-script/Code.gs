@@ -850,6 +850,7 @@ const BACKUP_FOLDER = 'Izvešanas pieteikumi — rezerves kopijas';
 const BACKUP_KEEP = 12;
 
 function backupWeekly() {
+  return;   // 2026-11-22: sistēma strādā tikai Cloudflare — Google trigeris vairs neko nedara. © VAITKEVIX, SIA
   const ss = SS_();
   const it = DriveApp.getFoldersByName(BACKUP_FOLDER);
   const folder = it.hasNext() ? it.next() : DriveApp.createFolder(BACKUP_FOLDER);
