@@ -2216,7 +2216,11 @@
     try { if (!state.pin) state.pin = localStorage.getItem('carrierPin') || ''; } catch(e){}
     state.unlocked = !!state.pin;
     if (!state.pin) try {   // ienācis portālā (izvedēja SIA vai administrators) → parole nav jāievada
-      google.script.run.withSuccessHandler(r => { if (r && r.name && !state.unlocked){ state.unlocked = true; state.pin = r.name + '\n*'; state.viaPortal = true; renderCarrierList(); } }).portalCarrier();
+      if (portalT()){ const tb = document.querySelector('.tab[data-tab="carrier"]'); if (tb) tb.style.display = 'none'; }   // portāla cilvēkam bez izvedēja tiesībām cilne nav vajadzīga
+      google.script.run.withSuccessHandler(r => {
+        if (r && r.name && !state.unlocked){ state.unlocked = true; state.pin = r.name + '\n*'; state.viaPortal = true; renderCarrierList(); }
+        if (r && r.name){ const tb = document.querySelector('.tab[data-tab="carrier"]'); if (tb){ tb.style.display = ''; moveTabInd(); } }
+      }).portalCarrier();
     } catch(e){}
     if (state.pin) try {
       google.script.run.withSuccessHandler(ok => { if (ok !== true){ lockCarrier(); toast('Parole ir mainīta — pieslēdzieties vēlreiz', 'err'); } }).checkCarrierPin(state.pin);
