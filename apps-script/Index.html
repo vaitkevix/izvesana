@@ -2215,6 +2215,9 @@
     try { state.pin = sessionStorage.getItem('carrierPin') || ''; } catch(e){}
     try { if (!state.pin) state.pin = localStorage.getItem('carrierPin') || ''; } catch(e){}
     state.unlocked = !!state.pin;
+    if (!state.pin) try {   // ienācis portālā (izvedēja SIA vai administrators) → parole nav jāievada
+      google.script.run.withSuccessHandler(r => { if (r && r.name && !state.unlocked){ state.unlocked = true; state.pin = r.name + '\n*'; state.viaPortal = true; renderCarrierList(); } }).portalCarrier();
+    } catch(e){}
     if (state.pin) try {
       google.script.run.withSuccessHandler(ok => { if (ok !== true){ lockCarrier(); toast('Parole ir mainīta — pieslēdzieties vēlreiz', 'err'); } }).checkCarrierPin(state.pin);
     } catch(e){}
@@ -3655,6 +3658,7 @@
           <div class="ic">${IC.lock}</div>
           <h3>Pieeja izvedējiem</h3>
           <p>Ierakstiet sava uzņēmuma (SIA) paroli, lai redzētu neizpildītos pieteikumus.</p>
+          ${portalT() ? `<p class="muted" style="font-size:13px">Šī cilne ir izvedējiem. Portāla PIN šeit neder — jaunu pieteikumu veidojiet cilnē «Jauns».</p>` : ''}
           <form id="pinForm" method="post" action="#" autocomplete="on" onsubmit="event.preventDefault();checkCarrierPin()">
             <input type="text" class="input pin-user" id="carrierUser" name="username" autocomplete="username" list="siaDl" placeholder="Uzņēmums (SIA)" value="${esc(lastUser())}">
             <datalist id="siaDl">${state.sia.map(x => `<option value="${esc(x)}"></option>`).join('')}</datalist>
@@ -3798,6 +3802,7 @@
     if (!u && state.sia.length === 1) u = state.sia[0];
     return u;
   }
+  function portalT(){ try { return localStorage.getItem('sh_t') || ''; } catch(e){ return ''; } }
   function carrierName(){ const p = String(state.pin || ''), i = p.indexOf('\n'); return i > 0 ? p.slice(0, i) : ''; }
   function checkCarrierPin(){
     const inp = document.getElementById('carrierPinInput'), uIn = document.getElementById('carrierUser');
