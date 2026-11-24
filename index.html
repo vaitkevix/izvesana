@@ -4097,14 +4097,14 @@
     }, () => { note.hidden = true; }));
   }
   function aiCompareRun(r){
-    const t = state.tasks.find(x => x.rowIndex === r), src = (photos['c' + r] || [])[0];
-    if (!t || !src || !String(t.photoBefore || '').trim()) return;
+    const t = state.tasks.find(x => x.rowIndex === r), src = (photos['c' + r] || [])[0], own = (photos['b' + r] || [])[0];
+    if (!t || !src || !(own || String(t.photoBefore || '').trim())) return;
     const set = (cls, html, warn) => {
       state.aiCmp[r] = { cls, html, warn: warn || '' };
       const n = document.getElementById('aic_' + r); if (n){ n.className = 'ai-note ' + cls; n.innerHTML = html; n.hidden = false; }
     };
     set('', '<span class="spinner"></span> AI salīdzina bildes pirms un pēc…');
-    shrinkData(src, 800).then(small => aiRun('aiCompare', [{ id: t.id, pin: state.pin, after: small }], res => {
+    Promise.all([shrinkData(src, 800), own ? shrinkData(own, 800) : Promise.resolve('')]).then(([small, b]) => aiRun('aiCompare', [{ id: t.id, pin: state.pin, after: small, before: b || undefined }], res => {
       if (!(photos['c' + r] || []).length) return aiNoteClear('c' + r);
       const d = res.data || {};
       if (d.clean === null) return aiNoteClear('c' + r);
