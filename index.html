@@ -1700,7 +1700,7 @@
           <li>Atveriet cilni <b>Izvedējs</b> un ievadiet <b>PIN kodu</b>.</li>
           <li>Atļaujiet <b>atrašanās vietu</b>, tad saraksts sakārtosies no tuvākās adreses uz tālāko.</li>
           <li>Var filtrēt pēc veida un pārslēgt <b>Saraksts / Karte</b>.</li>
-          <li>Pēc izvešanas spiediet <b>Apstiprināt izpildi</b>. Lapām un Bio ievadiet <b>izvesto maisu skaitu</b> (150 l maisi), un m³ aprēķinās uzreiz. Atzīmējiet <b>Smagi maisi +10%</b> un/vai <b>Sadzīves atkritumi lapu maisos +5%</b>. Zariem ievadiet m³. Pievienojiet <b>bildi pēc</b> (obligāti).</li>
+          <li>Pēc izvešanas spiediet <b>Apstiprināt izpildi</b>. Lapām un Bio ievadiet <b>izvesto maisu skaitu</b> (150 l maisi), un m³ aprēķinās uzreiz. Atzīmējiet <b>Smagi maisi +10%</b> un/vai <b>Sadzīves atkritumi lapu maisos +5%</b>. Zariem ievadiet m³. Pievienojiet <b>bildi pirms savākšanas</b> un <b>bildi pēc</b> (abas obligāti).</li>
           <li>Ja izvest nevar, spiediet <b>Nevarēja izvest</b> un izvēlieties iemeslu. Pieteikums paliek sarakstā, un pasūtītājs redz iemeslu.</li>
         </ol>
         <ul>
@@ -3231,7 +3231,7 @@
             </div>
             ${t.coefNote ? `<div class="note"><b>Koeficients:</b> ${esc(t.coefNote)}</div>` : ''}
             ${t.carrierComment ? `<div class="note"><b>Izvedējs:</b> ${esc(t.carrierComment)}</div>` : ''}
-            ${t.photoAfter ? `<div class="links">${photoChip(t.photoAfter, 'Bilde pēc')}</div>` : ''}
+            ${t.photoCarrierBefore || t.photoAfter ? `<div class="links">${t.photoCarrierBefore ? photoChip(t.photoCarrierBefore, 'Bilde pirms savākšanas') : ''}${t.photoAfter ? photoChip(t.photoAfter, 'Bilde pēc') : ''}</div>` : ''}
           </div>` : ''}
         ${historyHtml(t)}
         </div>
@@ -3801,6 +3801,11 @@
         <details class="complete" data-r="${r}" ${openRows[r] ? 'open' : ''}>
           <summary>${IC.check} Atzīmēt izpildi ${IC.chev}</summary>
           <div class="body">
+            <div class="field">
+              <span class="label">Bilde pirms savākšanas <span class="req">· obligāti</span></span>
+              <p class="photo-hint">Nofotografējiet atkritumus, pirms tos savācat.</p>
+              ${dropzone('b' + r)}
+            </div>
             ${usesBags(t) ? `
             <div class="field">
               <label class="label" for="bg_${r}">Izvesto maisu skaits <span class="opt">· 150 l maisi</span></label>
@@ -3840,7 +3845,7 @@
       const bg = document.getElementById('bg_' + r); if (bg){ bg.value = v.bg; document.getElementById('hv_' + r).checked = v.hv; document.getElementById('mx_' + r).checked = v.mx; bagsPreview(+r); }
       const c = document.getElementById('cc_' + r); if (c) c.value = v.cc;
     });
-    Object.keys(photos).filter(k => k[0] === 'c').forEach(renderThumbs);
+    Object.keys(photos).filter(k => k[0] === 'c' || k[0] === 'b').forEach(renderThumbs);
   }
 
 
@@ -3904,6 +3909,9 @@
       if (m3 > 60) return toast('Pārbaudiet m³: viena izvešana ir līdz 60 m³', 'err');
     }
     if (processing > 0) return toast('Bilde vēl tiek apstrādāta, uzgaidiet', 'err');
+    const need = k => { const dz = document.getElementById('dz_' + k);
+      if (dz){ dz.scrollIntoView({ behavior: 'smooth', block: 'center' }); dz.classList.remove('dz-need'); void dz.offsetWidth; dz.classList.add('dz-need'); setTimeout(() => dz.classList.remove('dz-need'), 1600); } };
+    if (!(photos['b' + r] || []).length){ need('b' + r); return toast('Pievienojiet bildi pirms savākšanas', 'err'); }
     if (!(photos['c' + r] || []).length){
       const dz = document.getElementById('dz_c' + r);
       if (dz){ dz.scrollIntoView({ behavior: 'smooth', block: 'center' }); dz.classList.remove('dz-need'); void dz.offsetWidth; dz.classList.add('dz-need'); setTimeout(() => dz.classList.remove('dz-need'), 1600); }
@@ -3913,11 +3921,11 @@
     const btn = document.getElementById('compBtn_' + r);
     setBusy(btn, true, 'Saglabā…');
 
-    stampPhotos('c' + r, task.address).then(list => google.script.run
+    Promise.all([stampPhotos('b' + r, task.address), stampPhotos('c' + r, task.address)]).then(([listB, list]) => google.script.run
       .withSuccessHandler(res => {
         if (res && res.status === 'success'){
           showFx('done', 'Izpilde apstiprināta!', task.address + ' · ' + fmt(m3, 2) + ' m³ izvesti');
-          delete photos['c' + r];
+          delete photos['c' + r]; delete photos['b' + r];
           const d = btn.closest('details'); if (d) d.open = false;
           useTasks(res);
         } else if (res && res.code === 'pin'){
@@ -3935,6 +3943,7 @@
       .completeTask({
         id: task.id,
         pin: state.pin,
+        photosBefore: listB,
         photosAfter: list,
         m3Hauled: m3,
         bagsHauled: bagMode ? bc.bags : '',
