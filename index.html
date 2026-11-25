@@ -3317,7 +3317,7 @@
   /* ---- Salīdzinājums ar iepriekšējo gadu (izv_hist: 2025 — ECO Mineral, m³ un reizes). © VAITKEVIX, SIA ---- */
   function addrKey(s){ return String(s || '').replace(/^.*\|\s*/, '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/\b(iela|gatve|bulvaris|prospekts|dambis)\b/g, '').replace(/[^a-z0-9]/g, ''); }
-  const SHOW_HIST = true;   // 2025 salīdzinājums (D1 izv_hist no ECO Mineral Excel); false = paslēpt
+  const SHOW_HIST = false;   // 2025 salīdzinājums paslēpts (D1 izv_hist paliek); true = rādīt
   /* Mājas adresē: «Dzelzavas iela 104, 106» → ['DZELZAVAS|104','DZELZAVAS|106'] (apvienoto objektu atpazīšanai) */
   const H_STOP = /^(IELA|GATVE|BULVARIS|PROSPEKTS|DAMBIS|VNI|J|IR|KK|EE)$/;
   function housesOf(a){
