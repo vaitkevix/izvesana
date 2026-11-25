@@ -523,6 +523,10 @@
     .addr-row .chips{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--ink-2)}
     .addr-row .chips b{color:var(--ink)}
     .addr-row .chips.kinds{margin-top:6px}
+    .drag-over{outline:3px dashed var(--brand)!important;outline-offset:3px;background:color-mix(in srgb,var(--brand) 8%,transparent)!important;border-radius:14px}
+    .cdone{margin-top:14px}.cdone summary{cursor:pointer;list-style:none;padding:4px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}.cdone summary::-webkit-details-marker{display:none}
+    .cdone .mut{color:var(--ink-3);font-size:13px}
+    .cdone-row{padding:12px 0;border-top:1px solid var(--line)}.cdone-row .t{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}.cdone-row .t small{color:var(--ink-3);font-size:12.5px}
     .addr-row .chips.prev{margin-top:4px;color:var(--ink-3)}
     .addr-row .chips .yr{font-weight:800;color:var(--ink-3);min-width:34px}
     .cmp-tot b.py{font-size:inherit;font-weight:800;color:var(--ink)}
@@ -2034,7 +2038,7 @@
         <div class="thumbs" id="th_${key}"></div>
         <label for="file_${key}" class="drop-empty">
           <span class="ic">${IC.camLg}</span>
-          <span><b id="dzt_${key}">Pievienot bildes</b><small>Līdz ${MAX_PHOTOS} bildēm — uzņemiet vai izvēlieties no galerijas</small></span>
+          <span><b id="dzt_${key}">Pievienot bildes</b><small>Līdz ${MAX_PHOTOS} bildēm — uzņemiet, izvēlieties no galerijas vai ievelciet</small></span>
         </label>
       </div>`;
   }
@@ -2278,7 +2282,7 @@
     if (!state.pin) try {   // ienācis portālā (izvedēja SIA vai administrators) → parole nav jāievada
       if (portalT()){ const tb = document.querySelector('.tab[data-tab="carrier"]'); if (tb) tb.style.display = 'none'; }   // portāla cilvēkam bez izvedēja tiesībām cilne nav vajadzīga
       google.script.run.withSuccessHandler(r => {
-        if (r && r.name && !state.unlocked){ state.unlocked = true; state.pin = r.name + '\n*'; state.viaPortal = true; renderCarrierList(); }
+        if (r && r.name && !state.unlocked){ state.unlocked = true; state.pin = r.name + '\n*'; state.viaPortal = true; renderCarrierList(); renderTaskList(); }
         if (r && r.name){ const tb = document.querySelector('.tab[data-tab="carrier"]'); if (tb){ tb.style.display = ''; moveTabInd(); } }
       }).portalCarrier();
     } catch(e){}
@@ -2665,7 +2669,7 @@
       <div class="field"><label class="label" for="ed_comment">Komentārs</label><textarea class="textarea" id="ed_comment"></textarea></div>
       ${isDone(t) ? `<div class="field"><label class="label" for="ed_m3">Izvesti m³</label><input class="input" id="ed_m3" inputmode="decimal" value="${esc(String(t.m3Hauled || '').replace('.', ','))}"></div>
       <div class="field"><label class="label" for="ed_ckom">Izvedēja komentārs</label><textarea class="textarea" id="ed_ckom"></textarea></div>
-      <p class="hint" style="margin:0 0 8px">Pieteikums jau izpildīts — izmaiņas ierakstīs vēsturē. Labot var administrators.</p>` : ''}
+      <p class="hint" style="margin:0 0 8px">Pieteikums jau izpildīts. Labot var izvedējs vai administrators.</p>` : ''}
       <div class="dlg-actions">
         <button type="button" class="btn btn-ghost" onclick="dlgClose(false)">Aizvērt</button>
         <button type="button" class="btn btn-primary" id="ed_save" onclick="saveEdit()">Saglabāt</button>
@@ -2700,9 +2704,13 @@
   /* Papildu bildes pēc izvešanas (izpildītam pieteikumam). © VAITKEVIX, SIA */
   function addAfterPhotos(id){
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
-    inp.onchange = () => {
-      const files = [...inp.files].slice(0, 5); if (!files.length) return;
-      if (inp.files.length > 5) toast('Vienā reizē līdz 5 bildēm — pievienoju pirmās 5');
+    inp.onchange = () => uploadAfter(id, [...inp.files]);
+    inp.click();
+  }
+  function uploadAfter(id, all){
+      all = all.filter(f => /^image\//.test(f.type));
+      const files = all.slice(0, 5); if (!files.length) return toast('Tās nav bildes', 'err');
+      if (all.length > 5) toast('Vienā reizē līdz 5 bildēm — pievienoju pirmās 5');
       toast('Augšupielādē ' + files.length + (files.length === 1 ? ' bildi…' : ' bildes…'));
       Promise.all(files.map(f => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(''); r.readAsDataURL(f); })
         .then(src => src ? shrinkData(src, 1600) : '')))
@@ -2713,8 +2721,33 @@
           .withFailureHandler(err => toast('Kļūda: ' + err.message, 'err'))
           .addPhotos({ id, photos: list, pin: state.pin });
       });
-    };
-    inp.click();
+  }
+  /* Bilžu ievilkšana ar peli: uz bilžu lauku (.drop) vai uz izpildīta pieteikuma (data-drop-id). © VAITKEVIX, SIA */
+  (function(){
+    const hasFiles = e => e.dataTransfer && [...(e.dataTransfer.types || [])].indexOf('Files') >= 0;
+    const target = e => e.target.closest && e.target.closest('.drop, [data-drop-id]');
+    let last = null;
+    const mark = el => { if (last && last !== el) last.classList.remove('drag-over'); if (el) el.classList.add('drag-over'); last = el; };
+    document.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); const t = target(e); e.dataTransfer.dropEffect = t ? 'copy' : 'none'; mark(t); });
+    document.addEventListener('dragleave', e => { if (!e.relatedTarget) mark(null); });
+    document.addEventListener('drop', e => {
+      if (!hasFiles(e)) return; e.preventDefault(); const t = target(e); mark(null); if (!t) return;
+      const files = [...e.dataTransfer.files];
+      if (t.dataset.dropId) return uploadAfter(t.dataset.dropId, files);
+      const key = t.id.replace(/^dz_/, ''); if (t.classList.contains('full')) return toast('Var pievienot ne vairāk kā ' + MAX_PHOTOS + ' bildes', 'err');
+      onPhoto({ target: { files: files.filter(f => /^image\//.test(f.type)), value: '' } }, key);
+    });
+  })();
+  function deleteTaskAsk(id){
+    const t = findTask(id); if (!t) return;
+    ask({ title: 'Dzēst pieteikumu?', html: `<b>${esc(t.address)}</b><br>${esc(t.date)} · ${KIND_NAME[kindOf(t)]}${isDone(t) ? ' · izpildīts, ' + (fmtM3(t.m3Hauled) || '—') + ' m³' : ''}<br><br>Pieteikums pazudīs no sarakstiem, statistikas un atskaitēm. Dzēst var izvedējs vai administrators.`,
+      ok: 'Dzēst', cancel: 'Paturēt', danger: true }).then(yes => {
+      if (!yes) return;
+      google.script.run
+        .withSuccessHandler(res => { if (res && res.status === 'success'){ toast('Pieteikums dzēsts'); useTasks(res); } else toast('Kļūda: ' + ((res && res.message) || 'nezināma kļūda'), 'err'); })
+        .withFailureHandler(err => toast('Kļūda: ' + err.message, 'err'))
+        .deleteTask(id);
+    });
   }
   function cancelTaskAsk(id){
     const t = findTask(id);
@@ -3265,7 +3298,7 @@
           <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="shareTask(this.dataset.id)">${IC.share} Dalīties</button>
         </div>
         ${isDone(t) ? `
-          <div class="done-block">
+          <div class="done-block" ${state.unlocked ? `data-drop-id="${esc(t.id)}" title="Var ievilkt bildes pēc izvešanas"` : ''}>
             <div class="meta">
               ${t.sia ? metaItem(IC.truck, 'Izvedējs', t.sia) : ''}
               ${metaItem(IC.cube, 'Izvesti m³', fmtM3(t.m3Hauled))}
@@ -3274,8 +3307,9 @@
             ${t.coefNote ? `<div class="note"><b>Koeficients:</b> ${esc(t.coefNote)}</div>` : ''}
             ${t.carrierComment ? `<div class="note"><b>Izvedējs:</b> ${esc(t.carrierComment)}</div>` : ''}
             <div class="links">${t.photoCarrierBefore ? photoChip(t.photoCarrierBefore, 'Bilde pirms savākšanas') : ''}${t.photoAfter ? photoChip(t.photoAfter, 'Bilde pēc') : ''}
-              <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="addAfterPhotos(this.dataset.id)">${IC.cam} Pievienot bildes</button>
-              <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="editTask(this.dataset.id)">${IC.edit} Labot</button></div>
+              ${state.unlocked ? `<button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="addAfterPhotos(this.dataset.id)">${IC.cam} Pievienot bildes</button>
+              <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="editTask(this.dataset.id)">${IC.edit} Labot</button>
+              <button type="button" class="chip-link danger" data-id="${esc(t.id)}" onclick="deleteTaskAsk(this.dataset.id)">${IC.x} Dzēst</button>` : ''}</div>
           </div>` : ''}
         ${historyHtml(t)}
         </div>
@@ -3895,12 +3929,12 @@
       ? ((km[a.id] == null ? 1e9 : km[a.id]) - (km[b.id] == null ? 1e9 : km[b.id]))
       : b.rowIndex - a.rowIndex));
     if (!allPending.length){
-      box.innerHTML = emptyState(IC.leafBig, 'Viss izvests!', 'Šobrīd nav neviena neizpildīta pieteikuma.');
+      box.innerHTML = emptyState(IC.leafBig, 'Viss izvests!', 'Šobrīd nav neviena neizpildīta pieteikuma.') + carrierDoneHtml();
       renderSortBar();
       return;
     }
     if (!pending.length){
-      box.innerHTML = emptyState(IC.inbox, 'Šim veidam nav pieteikumu', 'Izvēlieties citu veidu vai “Visi”.');
+      box.innerHTML = emptyState(IC.inbox, 'Šim veidam nav pieteikumu', 'Izvēlieties citu veidu vai “Visi”.') + carrierDoneHtml();
       renderSortBar();
       if (state.carrierSort === 'map') updateMap([]);
       return;
@@ -3938,6 +3972,8 @@
           <a class="chip-link nav-main" href="${navUrl(t.address)}" target="_blank">${IC.pin} Navigēt</a>
           <a class="chip-link waze" href="${wazeUrl(t.address)}" target="_blank" aria-label="Atvērt Waze">${IC.waze} Waze</a>
           <button type="button" class="chip-link ghost" onclick="problemAsk(${r})">${IC.alertSm} Nevarēja izvest</button>
+          <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="editTask(this.dataset.id)">${IC.edit} Labot</button>
+          <button type="button" class="chip-link danger" data-id="${esc(t.id)}" onclick="deleteTaskAsk(this.dataset.id)" aria-label="Dzēst">${IC.x}</button>
           <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="shareTask(this.dataset.id)" aria-label="Dalīties">${IC.share}</button>
         </div>
         <details class="complete" data-r="${r}" ${openRows[r] ? 'open' : ''}>
@@ -3976,7 +4012,7 @@
           </div>
         </details>
       </article>`;
-    }).join('') + '</div>';
+    }).join('') + '</div>' + carrierDoneHtml();
     renderSortBar();
     if (state.carrierSort === 'map') updateMap(pending);
 
@@ -3991,6 +4027,23 @@
   }
 
 
+  /* Izvedēja sadaļā: nesen izpildītie — pievienot bildes pēc, labot, dzēst */
+  function carrierDoneHtml(){
+    const all = state.tasks.filter(isDone).filter(t => state.carrierKind === 'all' || kindOf(t) === state.carrierKind);
+    if (!all.length) return '';
+    const list = all.slice(0, state.carrierDoneN || 20);
+    return `<details class="card section-card cdone" ${state.carrierDoneOpen ? 'open' : ''} ontoggle="state.carrierDoneOpen = this.open">
+      <summary><b>${IC.check} Izpildītie</b> <span class="mut">· pievienot bildes pēc, labot, dzēst (${all.length})</span></summary>
+      ${list.map(t => `<div class="cdone-row" data-drop-id="${esc(t.id)}">
+        <div class="t"><b>${esc(t.address)}</b><small>${esc(String(t.doneAt || t.date).split(' ')[0])} · ${KIND_NAME[kindOf(t)]} · ${fmtM3(t.m3Hauled) || '—'} m³</small></div>
+        <div class="links">${t.photoAfter ? photoChip(t.photoAfter, 'Bilde pēc') : ''}
+          <button type="button" class="chip-link" data-id="${esc(t.id)}" onclick="addAfterPhotos(this.dataset.id)">${IC.cam} Pievienot bildes</button>
+          <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="editTask(this.dataset.id)">${IC.edit} Labot</button>
+          <button type="button" class="chip-link danger" data-id="${esc(t.id)}" onclick="deleteTaskAsk(this.dataset.id)">${IC.x} Dzēst</button></div>
+      </div>`).join('')}
+      ${all.length > list.length ? `<button class="more-btn" onclick="state.carrierDoneN=(state.carrierDoneN||20)+20;state.carrierDoneOpen=true;renderCarrierList()">Rādīt vēl (${all.length - list.length})</button>` : ''}
+    </details>`;
+  }
   function lastUser(){
     let u = '';
     try { u = localStorage.getItem('carrierUser') || ''; } catch(e){}
@@ -4014,7 +4067,7 @@
           state.unlocked = true; state.pin = pin;
           const rem = document.getElementById('pinRemember');
           try { (rem && rem.checked ? localStorage : sessionStorage).setItem('carrierPin', pin); } catch(e){}
-          renderCarrierList();
+          renderCarrierList(); renderTaskList();
         } else {
           setBusy(btn, false, 'Pieslēgties');
           const card = document.getElementById('lockCard');
@@ -4030,7 +4083,7 @@
     state.unlocked = false; state.pin = ''; state.access = null;
     try { sessionStorage.removeItem('carrierPin'); } catch(e){}
     try { localStorage.removeItem('carrierPin'); } catch(e){}
-    renderCarrierList();
+    renderCarrierList(); renderTaskList();
   }
 
   function submitTaskCompletion(r){
