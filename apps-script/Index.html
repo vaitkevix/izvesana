@@ -573,6 +573,7 @@
     .photo-head b{font-size:15px;font-weight:800}
     .photo-head small{font-size:12.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .photo-head .icon-btn{text-decoration:none;flex:none}
+    .photo-head .icon-btn.danger{color:#d92d20}
     .photo-body{display:grid;place-items:center;min-height:220px;background:#0b0f0d;color:#cbd5d0;font-size:14px;font-weight:600;text-align:center}
     .photo-body img{display:block;max-width:100%;max-height:min(68vh,560px);object-fit:contain}
     .photo-body iframe{display:block;width:100%;height:min(68vh,560px);border:0;background:#0b0f0d}
@@ -1613,6 +1614,9 @@
       <a class="icon-btn" id="photoOpen" target="_blank" rel="noopener" title="Atvērt jaunā cilnē" aria-label="Atvērt jaunā cilnē">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
       </a>
+      <button type="button" class="icon-btn danger" id="photoDel" hidden onclick="deletePhotoAsk()" title="Dzēst bildi" aria-label="Dzēst bildi">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+      </button>
       <button type="button" class="icon-btn" onclick="closePhoto()" title="Aizvērt" aria-label="Aizvērt">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
@@ -2085,16 +2089,18 @@
   }
   function photoUrls(s){ return String(s || '').split(/\s+/).filter(Boolean); }
 
-  function photoChip(str, title){
+  const phAttr = (tid, field) => tid ? ` data-tid="${esc(tid)}" data-field="${field}"` : '';
+  function photoChip(str, title, tid, field){
     const u = photoUrls(str);
     if (!u.length) return '';
     const label = u.length > 1 ? title.replace('Bilde', 'Bildes') + ' (' + u.length + ')' : title;
-    return `<a class="chip-link" href="${esc(u[0])}" target="_blank" data-urls="${esc(u.join(' '))}" onclick="return openPhoto(event, this, '${title}')">${IC.cam} ${label}</a>`;
+    return `<a class="chip-link" href="${esc(u[0])}" target="_blank" data-urls="${esc(u.join(' '))}"${phAttr(tid, field)} onclick="return openPhoto(event, this, '${title}')">${IC.cam} ${label}</a>`;
   }
-  let photoCur = '', photoSet = [], photoIdx = 0, photoName = '';
+  let photoCur = '', photoSet = [], photoIdx = 0, photoName = '', photoTid = '', photoField = '';
   function openPhoto(e, link, title){
     if (e) e.preventDefault();
-    photoSet = photoUrls(link.dataset.urls || link.href); photoIdx = 0; photoName = title || 'Bilde';
+    photoSet = photoUrls(link.dataset.urls || link.href); photoIdx = Math.max(0, photoSet.indexOf(link.getAttribute('href'))); photoName = title || 'Bilde';
+    photoTid = link.dataset.tid || ''; photoField = link.dataset.field || '';
     if (!photoSet.length) return false;
     const card = link.closest ? link.closest('.task') : null, addr = card ? card.querySelector('.addr') : null;
     document.getElementById('photoSub').textContent = addr ? addr.textContent : '';
@@ -2102,6 +2108,21 @@
     document.body.style.overflow = 'hidden';
     showPhoto();
     return false;
+  }
+  function deletePhotoAsk(){
+    const url = photoSet[photoIdx], id = photoTid, field = photoField; if (!url || !id) return;
+    ask({ title: 'Dzēst bildi?', html: 'Bilde tiks noņemta no pieteikuma. Dzēst var izvedējs vai administrators.', ok: 'Dzēst bildi', cancel: 'Paturēt', danger: true }).then(yes => {
+      if (!yes) return;
+      google.script.run
+        .withSuccessHandler(res => {
+          if (!(res && res.status === 'success')) return toast('Kļūda: ' + ((res && res.message) || 'nezināma kļūda'), 'err');
+          toast('Bilde dzēsta'); photoSet.splice(photoIdx, 1);
+          if (!photoSet.length) closePhoto(); else { photoIdx = photoIdx % photoSet.length; showPhoto(); }
+          useTasks(res);
+        })
+        .withFailureHandler(err => toast('Kļūda: ' + err.message, 'err'))
+        .removePhoto({ id, field, url });
+    });
   }
   function photoStep(d){
     if (photoSet.length < 2) return;
@@ -2112,6 +2133,7 @@
     const url = photoSet[photoIdx], body = document.getElementById('photoBody'), n = photoSet.length;
     document.getElementById('photoTitle').textContent = photoName;
     document.getElementById('photoOpen').href = url;
+    document.getElementById('photoDel').hidden = !(state.unlocked && photoTid && photoField);
     document.getElementById('photoNav').hidden = n < 2;
     document.getElementById('photoCount').textContent = (photoIdx + 1) + ' / ' + n;
     photoCur = url;
@@ -3246,7 +3268,7 @@
         ${problemHtml(t)}
         <div class="links">
           <a class="chip-link map" href="${mapsUrl(t.address)}" target="_blank">${IC.pin} Kartē</a>
-          ${photoChip(t.photoBefore, 'Bilde pirms')}
+          ${photoChip(t.photoBefore, 'Bilde pirms', t.id, 'before')}
           ${isCancelled(t)
             ? `<button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="setCancelled(this.dataset.id, false)">${IC.undo} Atjaunot</button>`
             : !isDone(t) ? `<button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="editTask(this.dataset.id)">${IC.edit} Labot</button>
@@ -3262,7 +3284,7 @@
             </div>
             ${t.coefNote ? `<div class="note"><b>Koeficients:</b> ${esc(t.coefNote)}</div>` : ''}
             ${t.carrierComment ? `<div class="note"><b>Izvedējs:</b> ${esc(t.carrierComment)}</div>` : ''}
-            <div class="links">${t.photoCarrierBefore ? photoChip(t.photoCarrierBefore, 'Bilde pirms savākšanas') : ''}${t.photoAfter ? photoChip(t.photoAfter, 'Bilde pēc') : ''}
+            <div class="links">${t.photoCarrierBefore ? photoChip(t.photoCarrierBefore, 'Bilde pirms savākšanas', t.id, 'cbefore') : ''}${t.photoAfter ? photoChip(t.photoAfter, 'Bilde pēc', t.id, 'after') : ''}
               ${state.unlocked ? `<button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="addAfterPhotos(this.dataset.id)">${IC.cam} Pievienot bildes</button>
               <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="editTask(this.dataset.id)">${IC.edit} Labot</button>
               <button type="button" class="chip-link danger" data-id="${esc(t.id)}" onclick="deleteTaskAsk(this.dataset.id)">${IC.x} Dzēst</button>` : ''}</div>
@@ -3923,7 +3945,7 @@
         ${t.comment ? `<div class="note">${esc(t.comment)}</div>` : ''}
         ${accessHtml(t)}
         ${problemHtml(t)}
-        ${thumbsHtml(t.photoBefore, 'Bilde pirms')}
+        ${thumbsHtml(t.photoBefore, 'Bilde pirms', t.id, 'before')}
         <div class="links">
           <a class="chip-link nav-main" href="${navUrl(t.address)}" target="_blank">${IC.pin} Navigēt</a>
           <a class="chip-link waze" href="${wazeUrl(t.address)}" target="_blank" aria-label="Atvērt Waze">${IC.waze} Waze</a>
@@ -3992,7 +4014,7 @@
       <summary><b>${IC.check} Izpildītie</b> <span class="mut">· pievienot bildes pēc, labot, dzēst (${all.length})</span></summary>
       ${list.map(t => `<div class="cdone-row" data-drop-id="${esc(t.id)}">
         <div class="t"><b>${esc(t.address)}</b><small>${esc(String(t.doneAt || t.date).split(' ')[0])} · ${KIND_NAME[kindOf(t)]} · ${fmtM3(t.m3Hauled) || '—'} m³</small></div>
-        <div class="links">${t.photoAfter ? photoChip(t.photoAfter, 'Bilde pēc') : ''}
+        <div class="links">${t.photoAfter ? photoChip(t.photoAfter, 'Bilde pēc', t.id, 'after') : ''}
           <button type="button" class="chip-link" data-id="${esc(t.id)}" onclick="addAfterPhotos(this.dataset.id)">${IC.cam} Pievienot bildes</button>
           <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="editTask(this.dataset.id)">${IC.edit} Labot</button>
           <button type="button" class="chip-link danger" data-id="${esc(t.id)}" onclick="deleteTaskAsk(this.dataset.id)">${IC.x} Dzēst</button></div>
@@ -4322,13 +4344,13 @@
     const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 864e5);
     return days <= 0 ? 'šodien' : days === 1 ? 'vakar' : 'pirms ' + days + (days % 10 === 1 && days % 100 !== 11 ? ' dienas' : ' dienām');
   }
-  function thumbsHtml(str, title){
+  function thumbsHtml(str, title, tid, field){
     const u = photoUrls(str);
     if (!u.length) return '';
     return '<div class="thumbs">' + u.map(x => {
       const id = driveId(x);
       const src = id ? 'https:\/\/drive.google.com/thumbnail?id=' + id + '&sz=w600' : x;
-      return `<a href="${esc(x)}" target="_blank" data-urls="${esc(u.join(' '))}" onclick="return openPhoto(event, this, '${title}')"><img loading="lazy" alt="${title}" src="${esc(src)}"></a>`;
+      return `<a href="${esc(x)}" target="_blank" data-urls="${esc(u.join(' '))}"${phAttr(tid, field)} onclick="return openPhoto(event, this, '${title}')"><img loading="lazy" alt="${title}" src="${esc(src)}"></a>`;
     }).join('') + '</div>';
   }
   function timelineHtml(t){
