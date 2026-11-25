@@ -481,7 +481,9 @@
     .addr-row .chips{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--ink-2)}
     .addr-row .chips b{color:var(--ink)}
     .addr-row .chips.kinds{margin-top:6px}
-    .addr-row .chips.prev{margin-top:6px;align-items:center}
+    .addr-row .chips.prev{margin-top:4px;color:var(--ink-3)}
+    .addr-row .chips .yr{font-weight:800;color:var(--ink-3);min-width:34px}
+    .cmp-tot b.py{font-size:inherit;font-weight:800;color:var(--ink)}
     .dz{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:800;background:var(--surface-solid);color:var(--ink-2);white-space:nowrap}
     .dz.up{background:#fde8e1;color:#b4401f}.dz.down{background:#dff3e8;color:#17784a}
     :root[data-theme="dark"] .dz.up{background:rgba(244,114,82,.18);color:#ffab91}:root[data-theme="dark"] .dz.down{background:rgba(34,197,94,.16);color:#86efac}
@@ -3258,8 +3260,6 @@
     return from <= to ? { from, to } : null;
   }
   const CMP_K = { bags:'Lapas', branches:'Zari', bio:'Bio', bulky:'Lielgabarīts', other:'Citi (būvgruži u.c.)' };
-  function dPct(a, b){ if (!b) return a ? '<span class="dz up">jauns</span>' : ''; const p = Math.round((a - b) / b * 100);
-    return `<span class="dz ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">${p > 0 ? '▲ +' : p < 0 ? '▼ −' : ''}${Math.abs(p)}%</span>`; }
   function wLabel(w){ const f = x => Math.floor(x / 100), d = x => x % 100;
     return `${d(w.from)}. ${MSHORT[f(w.from)].toLowerCase()} – ${w.to % 100 === 31 && f(w.to) === 11 ? '31. dec' : d(w.to) + '. ' + MSHORT[f(w.to)].toLowerCase()}`; }
   function cmpData(allRows, Y, M, SK, hasBulky){
@@ -3274,11 +3274,13 @@
     const TK = SK !== 'all' ? SK : hasBulky ? '_all' : '_lzb', off = hasBulky ? [] : ['bulky', 'other'];
     let skip = 0;
     H.forEach(h => { if (!inW(h[1] - 1, h[2])) return;
+      if (h[4][0] !== '_' && (SK === 'all' || h[4] === SK)){   // pa adresēm un veidiem (arī lielgabarīts — lai redz, kas tur bija)
+        const ak = byA[addrKey(h[3])] || (byA[addrKey(h[3])] = { n:0, m3:0, K:{} }), q = ak.K[h[4]] || (ak.K[h[4]] = { n:0, m3:0 });
+        q.n += h[5]; q.m3 += h[6]; ak.n += h[5]; }
       if (off.indexOf(h[4]) >= 0){ if (SK === 'all') skip += h[6]; return; }
       if (h[4][0] !== '_' && (SK === 'all' || h[4] === SK)){ const o = prev[h[4]] || (prev[h[4]] = { n:0, m3:0 }); o.n += h[5]; o.m3 += h[6]; }
       if (h[4] !== TK) return;
-      tp.n += h[5]; tp.m3 += h[6];
-      const a = byA[addrKey(h[3])] || (byA[addrKey(h[3])] = { n:0, m3:0 }); a.n += h[5]; a.m3 += h[6]; });
+      tp.n += h[5]; tp.m3 += h[6]; });
     return { w, cur, prev, tc, tp, byA, skip, PY: Y - 1 };
   }
   function cmpCard(C, Y){
@@ -3290,12 +3292,12 @@
       <h4>${IC.cube} Salīdzinājums ar ${C.PY} ${live ? '<span class="live">● tiešraide</span>' : ''}</h4>
       <p class="hint">Tas pats periods abos gados: <b>${wLabel(C.w)}</b>. Izpildītās izvešanas.</p>
       <div class="cmp-tot">
-        <div><span class="k">m³ ${Y}</span><b>${fmt(C.tc.m3, 1)}</b><small>${C.PY}: ${fmt(C.tp.m3, 1)}</small>${dPct(C.tc.m3, C.tp.m3)}</div>
-        <div><span class="k">Reizes ${Y}</span><b>${C.tc.n}</b><small>${C.PY}: ${C.tp.n}</small>${dPct(C.tc.n, C.tp.n)}</div>
+        <div><span class="k">m³ ${Y}</span><b>${fmt(C.tc.m3, 1)}</b><small>${C.PY}: <b class="py">${fmt(C.tp.m3, 1)}</b></small></div>
+        <div><span class="k">Reizes ${Y}</span><b>${C.tc.n}</b><small>${C.PY}: <b class="py">${C.tp.n}</b></small></div>
       </div>
-      ${ks.length ? `<table class="tbl cmp-tbl"><thead><tr><th>Veids</th><th>${Y}</th><th>${C.PY}</th><th>±</th></tr></thead><tbody>
+      ${ks.length ? `<table class="tbl cmp-tbl"><thead><tr><th>Veids</th><th>${Y}</th><th>${C.PY}</th></tr></thead><tbody>
         ${ks.map(k => { const a = C.cur[k] || z, b = C.prev[k] || z;
-          return `<tr><td><i class="kd" style="--c:${k === 'other' ? '#94a3b8' : kindDot(k)}"></i>${CMP_K[k]}</td><td><b>${fmt(a.m3, 1)} m³</b><small>${a.n}×</small></td><td><b>${fmt(b.m3, 1)} m³</b><small>${b.n}×</small></td><td>${dPct(a.m3, b.m3)}</td></tr>`; }).join('')}
+          return `<tr><td><i class="kd" style="--c:${k === 'other' ? '#94a3b8' : kindDot(k)}"></i>${CMP_K[k]}</td><td><b>${fmt(a.m3, 1)} m³</b><small>${a.n}×</small></td><td><b>${fmt(b.m3, 1)} m³</b><small>${b.n}×</small></td></tr>`; }).join('')}
       </tbody></table>` : ''}
       ${C.skip ? `<p class="hint" style="margin:8px 0 0">${C.PY}. gadā vēl lielgabarīts un citi: ${fmt(C.skip, 1)} m³. Salīdzinājumā tie nav ieskaitīti, jo Izvešanā tādu pieteikumu nav.</p>` : ''}
       <p class="hint" style="margin:8px 0 0">${C.PY}. gada dati no ECO Mineral rēķiniem (m³ aprēķināti). Tad katrai mājai bija atsevišķs rēķins, tāpēc ${C.PY}. gada reizes var būt vairāk.</p>
@@ -3446,8 +3448,8 @@
       const kk = (o.K || (o.K = {}))[r.k] || (o.K[r.k] = { n:0, done:0, m3:0 });   // pa veidiem: reizes un m³
       kk.n++; if (isDone(r.t)){ kk.done++; kk.m3 += num(r.t.m3Hauled); }
     });
-    state.addrPY = CMP ? { y: CMP.PY, w: wLabel(CMP.w) } : null;
-    if (CMP) Object.entries(A).forEach(([name, o]) => { o.prev = CMP.byA[addrKey(name)] || { n:0, m3:0 }; });
+    state.addrPY = CMP ? { y: CMP.PY, cy: Y, w: wLabel(CMP.w) } : null;
+    if (CMP) Object.entries(A).forEach(([name, o]) => { o.prev = CMP.byA[addrKey(name)] || { n:0, m3:0, K:{} }; });
     state.addrRows = Object.entries(A).map(([name, o]) => Object.assign({ name }, o))
       .sort((a,b) => b.m3 - a.m3 || b.n - a.n);
     document.getElementById('addrPeriod').textContent = '· ' + periodName + kindName;
@@ -3724,9 +3726,10 @@
           <span>Maisi: <b>${fmt(a.bags)}</b></span>
           <span>Pēdējais: <b>${esc(a.last)}</b></span>
         </div>
-        <div class="chips kinds">${KINDS.filter(k => a.K && a.K[k]).map(k => { const x = a.K[k];
+        <div class="chips kinds">${a.prev && a.prev.n && state.addrPY ? `<span class="yr">${state.addrPY.cy}</span>` : ''}${KINDS.filter(k => a.K && a.K[k]).map(k => { const x = a.K[k];
           return `<span><i style="--c:${kindDot(k)}"></i>${KIND_NAME[k]}: ${x.done ? `<b>${x.done}×</b>${x.n > x.done ? ' <small>(+' + (x.n - x.done) + ' gaida)</small>' : ''} · <b>${fmt(x.m3, 1)} m³</b>` : `<small>${x.n} gaida</small>`}</span>`; }).join('')}</div>
-        ${a.prev && a.prev.n && state.addrPY ? `<div class="chips prev"><span>${state.addrPY.y} tajā pašā periodā: <b>${fmt(a.prev.m3, 1)} m³</b> · <b>${a.prev.n}×</b></span>${dPct(a.m3, a.prev.m3)}</div>` : ''}
+        ${a.prev && a.prev.n && state.addrPY ? `<div class="chips kinds prev"><span class="yr">${state.addrPY.y}</span>${Object.keys(CMP_K).filter(k => a.prev.K[k]).map(k => { const x = a.prev.K[k];
+          return `<span><i style="--c:${k === 'other' ? '#94a3b8' : kindDot(k)}"></i>${k === 'other' ? 'Citi' : KIND_NAME[k]}: <b>${x.n}×</b> · <b>${fmt(x.m3, 1)} m³</b></span>`; }).join('')}</div>` : ''}
       </div>`).join('');
   }
 
