@@ -2663,11 +2663,15 @@
       </div>
       <div class="field"><label class="switch-row" for="ed_urgent"><span class="st"><b>Steidzami</b></span><input type="checkbox" id="ed_urgent" ${t.urgent ? 'checked' : ''}><span class="sw" aria-hidden="true"></span></label></div>
       <div class="field"><label class="label" for="ed_comment">Komentārs</label><textarea class="textarea" id="ed_comment"></textarea></div>
+      ${isDone(t) ? `<div class="field"><label class="label" for="ed_m3">Izvesti m³</label><input class="input" id="ed_m3" inputmode="decimal" value="${esc(String(t.m3Hauled || '').replace('.', ','))}"></div>
+      <div class="field"><label class="label" for="ed_ckom">Izvedēja komentārs</label><textarea class="textarea" id="ed_ckom"></textarea></div>
+      <p class="hint" style="margin:0 0 8px">Pieteikums jau izpildīts — izmaiņas ierakstīs vēsturē. Labot var administrators.</p>` : ''}
       <div class="dlg-actions">
         <button type="button" class="btn btn-ghost" onclick="dlgClose(false)">Aizvērt</button>
         <button type="button" class="btn btn-primary" id="ed_save" onclick="saveEdit()">Saglabāt</button>
       </div>`);
     document.getElementById('ed_comment').value = t.comment;
+    if (isDone(t)) document.getElementById('ed_ckom').value = t.carrierComment || '';
   }
   function saveEdit(){
     const k = document.getElementById('ed_kind').value;
@@ -2679,6 +2683,9 @@
       urgent: document.getElementById('ed_urgent').checked,
       comment: document.getElementById('ed_comment').value
     };
+    const m3el = document.getElementById('ed_m3');
+    if (m3el){ data.m3Hauled = m3el.value.trim(); data.carrierComment = document.getElementById('ed_ckom').value;
+      if (data.m3Hauled && !(parseFloat(data.m3Hauled.replace(',', '.')) >= 0)) return toast('Ievadiet m³ skaitli', 'err'); }
     if (!data.address) return toast('Izvēlieties adresi', 'err');
     const btn = document.getElementById('ed_save');
     setBusy(btn, true, 'Saglabā…');
@@ -2689,6 +2696,25 @@
       })
       .withFailureHandler(err => { setBusy(btn, false, 'Saglabāt'); toast('Kļūda: ' + err.message, 'err'); })
       .updateTask(data);
+  }
+  /* Papildu bildes pēc izvešanas (izpildītam pieteikumam). © VAITKEVIX, SIA */
+  function addAfterPhotos(id){
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+    inp.onchange = () => {
+      const files = [...inp.files].slice(0, 5); if (!files.length) return;
+      if (inp.files.length > 5) toast('Vienā reizē līdz 5 bildēm — pievienoju pirmās 5');
+      toast('Augšupielādē ' + files.length + (files.length === 1 ? ' bildi…' : ' bildes…'));
+      Promise.all(files.map(f => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(''); r.readAsDataURL(f); })
+        .then(src => src ? shrinkData(src, 1600) : '')))
+      .then(list => {
+        list = list.filter(Boolean); if (!list.length) return toast('Neizdevās nolasīt bildi', 'err');
+        google.script.run
+          .withSuccessHandler(res => { if (res && res.status === 'success'){ toast('Bildes pievienotas'); useTasks(res); } else toast('Kļūda: ' + ((res && res.message) || 'nezināma kļūda'), 'err'); })
+          .withFailureHandler(err => toast('Kļūda: ' + err.message, 'err'))
+          .addPhotos({ id, photos: list, pin: state.pin });
+      });
+    };
+    inp.click();
   }
   function cancelTaskAsk(id){
     const t = findTask(id);
@@ -3247,7 +3273,9 @@
             </div>
             ${t.coefNote ? `<div class="note"><b>Koeficients:</b> ${esc(t.coefNote)}</div>` : ''}
             ${t.carrierComment ? `<div class="note"><b>Izvedējs:</b> ${esc(t.carrierComment)}</div>` : ''}
-            ${t.photoCarrierBefore || t.photoAfter ? `<div class="links">${t.photoCarrierBefore ? photoChip(t.photoCarrierBefore, 'Bilde pirms savākšanas') : ''}${t.photoAfter ? photoChip(t.photoAfter, 'Bilde pēc') : ''}</div>` : ''}
+            <div class="links">${t.photoCarrierBefore ? photoChip(t.photoCarrierBefore, 'Bilde pirms savākšanas') : ''}${t.photoAfter ? photoChip(t.photoAfter, 'Bilde pēc') : ''}
+              <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="addAfterPhotos(this.dataset.id)">${IC.cam} Pievienot bildes</button>
+              <button type="button" class="chip-link ghost" data-id="${esc(t.id)}" onclick="editTask(this.dataset.id)">${IC.edit} Labot</button></div>
           </div>` : ''}
         ${historyHtml(t)}
         </div>
