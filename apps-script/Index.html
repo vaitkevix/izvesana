@@ -481,6 +481,17 @@
     .addr-row .chips{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--ink-2)}
     .addr-row .chips b{color:var(--ink)}
     .addr-row .chips.kinds{margin-top:6px}
+    .addr-row .chips.prev{margin-top:6px;align-items:center}
+    .dz{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:800;background:var(--surface-solid);color:var(--ink-2);white-space:nowrap}
+    .dz.up{background:#fde8e1;color:#b4401f}.dz.down{background:#dff3e8;color:#17784a}
+    :root[data-theme="dark"] .dz.up{background:rgba(244,114,82,.18);color:#ffab91}:root[data-theme="dark"] .dz.down{background:rgba(34,197,94,.16);color:#86efac}
+    .cmp-card .live{font-size:12px;font-weight:800;color:#d92d20;margin-left:6px}
+    .cmp-tot{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 10px}
+    .cmp-tot>div{padding:12px 14px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
+    .cmp-tot .k{font-size:12px;color:var(--ink-3);font-weight:700}.cmp-tot b{font-size:24px;font-weight:800}.cmp-tot small{font-size:12.5px;color:var(--ink-2)}
+    .cmp-tot .dz{align-self:flex-start;margin-top:4px}
+    .cmp-tbl{width:100%}.cmp-tbl td small{display:block;font-size:12px;color:var(--ink-3)}.cmp-tbl td b{white-space:nowrap}
+    .cmp-tbl i.kd{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:6px}
     .addr-row .chips.kinds i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:1px}
     .addr-row .chips.kinds small{font-size:inherit;color:var(--ink-3,var(--ink-2))}
     .addr-search{margin-bottom:12px}
@@ -3229,8 +3240,71 @@
       ${list.length > 15 ? `<div class="od-more">un vēl ${list.length - 15}…</div>` : ''}
     </div>`;
   }
+  /* ---- Salīdzinājums ar iepriekšējo gadu (izv_hist: 2025 — ECO Mineral, m³ un reizes). © VAITKEVIX, SIA ---- */
+  function addrKey(s){ return String(s || '').replace(/^.*\|\s*/, '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/\b(iela|gatve|bulvaris|prospekts|dambis)\b/g, '').replace(/[^a-z0-9]/g, ''); }
+  function loadHist(){
+    if (state.histReq) return; state.histReq = 1;
+    google.script.run.withSuccessHandler(h => { state.hist = Array.isArray(h) ? h : []; if (state.hist.length) renderStatsView(); })
+      .withFailureHandler(() => { state.hist = []; }).getHist();
+  }
+  /* Logs: [no (mēn,diena)] līdz [līdz (mēn,diena)] — salīdzina tikai to pašu periodu abos gados */
+  function cmpWindow(allRows, Y, M){
+    const now = new Date(), cy = now.getFullYear(), cm = now.getMonth(), cd = now.getDate();
+    const ys = allRows.filter(r => r.d.y === Y).map(r => r.d.m * 100 + r.d.d);
+    if (!ys.length) return null;
+    let from = Math.min(...ys), to = Y === cy ? cm * 100 + cd : 1231;
+    if (M !== 'all'){ from = Math.max(from, +M * 100 + 1); to = Math.min(to, +M * 100 + 31); }
+    return from <= to ? { from, to } : null;
+  }
+  const CMP_K = { bags:'Lapas', branches:'Zari', bio:'Bio', bulky:'Lielgabarīts', other:'Citi (būvgruži u.c.)' };
+  function dPct(a, b){ if (!b) return a ? '<span class="dz up">jauns</span>' : ''; const p = Math.round((a - b) / b * 100);
+    return `<span class="dz ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">${p > 0 ? '▲ +' : p < 0 ? '▼ −' : ''}${Math.abs(p)}%</span>`; }
+  function wLabel(w){ const f = x => Math.floor(x / 100), d = x => x % 100;
+    return `${d(w.from)}. ${MSHORT[f(w.from)].toLowerCase()} – ${w.to % 100 === 31 && f(w.to) === 11 ? '31. dec' : d(w.to) + '. ' + MSHORT[f(w.to)].toLowerCase()}`; }
+  function cmpData(allRows, Y, M, SK, hasBulky){
+    const H = (state.hist || []).filter(h => h[0] === Y - 1);
+    if (!H.length) return null;
+    const w = cmpWindow(allRows, Y, M); if (!w) return null;
+    const inW = (m, d) => { const x = m * 100 + d; return x >= w.from && x <= w.to; };
+    const cur = {}, prev = {}, byA = {}, tc = { n:0, m3:0 }, tp = { n:0, m3:0 };
+    allRows.forEach(r => { if (r.d.y !== Y || !inW(r.d.m, r.d.d) || !isDone(r.t) || (SK !== 'all' && r.k !== SK)) return;
+      const v = num(r.t.m3Hauled), o = cur[r.k] || (cur[r.k] = { n:0, m3:0 }); o.n++; o.m3 += v; tc.n++; tc.m3 += v; });
+    /* '_all' = visi rēķini; '_lzb' = rēķini ar lapām/zariem/bio (ja Izvešanā nav lielgabarīta, salīdzina tikai to, kas abos gados ir) */
+    const TK = SK !== 'all' ? SK : hasBulky ? '_all' : '_lzb', off = hasBulky ? [] : ['bulky', 'other'];
+    let skip = 0;
+    H.forEach(h => { if (!inW(h[1] - 1, h[2])) return;
+      if (off.indexOf(h[4]) >= 0){ if (SK === 'all') skip += h[6]; return; }
+      if (h[4][0] !== '_' && (SK === 'all' || h[4] === SK)){ const o = prev[h[4]] || (prev[h[4]] = { n:0, m3:0 }); o.n += h[5]; o.m3 += h[6]; }
+      if (h[4] !== TK) return;
+      tp.n += h[5]; tp.m3 += h[6];
+      const a = byA[addrKey(h[3])] || (byA[addrKey(h[3])] = { n:0, m3:0 }); a.n += h[5]; a.m3 += h[6]; });
+    return { w, cur, prev, tc, tp, byA, skip, PY: Y - 1 };
+  }
+  function cmpCard(C, Y){
+    if (!C) return '';
+    const live = Y === new Date().getFullYear();
+    const ks = Object.keys(CMP_K).filter(k => (C.cur[k] && C.cur[k].n) || (C.prev[k] && C.prev[k].n));
+    const z = { n:0, m3:0 };
+    return `<div class="card section-card cmp-card">
+      <h4>${IC.cube} Salīdzinājums ar ${C.PY} ${live ? '<span class="live">● tiešraide</span>' : ''}</h4>
+      <p class="hint">Tas pats periods abos gados: <b>${wLabel(C.w)}</b>. Izpildītās izvešanas.</p>
+      <div class="cmp-tot">
+        <div><span class="k">m³ ${Y}</span><b>${fmt(C.tc.m3, 1)}</b><small>${C.PY}: ${fmt(C.tp.m3, 1)}</small>${dPct(C.tc.m3, C.tp.m3)}</div>
+        <div><span class="k">Reizes ${Y}</span><b>${C.tc.n}</b><small>${C.PY}: ${C.tp.n}</small>${dPct(C.tc.n, C.tp.n)}</div>
+      </div>
+      ${ks.length ? `<table class="tbl cmp-tbl"><thead><tr><th>Veids</th><th>${Y}</th><th>${C.PY}</th><th>±</th></tr></thead><tbody>
+        ${ks.map(k => { const a = C.cur[k] || z, b = C.prev[k] || z;
+          return `<tr><td><i class="kd" style="--c:${k === 'other' ? '#94a3b8' : kindDot(k)}"></i>${CMP_K[k]}</td><td><b>${fmt(a.m3, 1)} m³</b><small>${a.n}×</small></td><td><b>${fmt(b.m3, 1)} m³</b><small>${b.n}×</small></td><td>${dPct(a.m3, b.m3)}</td></tr>`; }).join('')}
+      </tbody></table>` : ''}
+      ${C.skip ? `<p class="hint" style="margin:8px 0 0">${C.PY}. gadā vēl lielgabarīts un citi: ${fmt(C.skip, 1)} m³. Salīdzinājumā tie nav ieskaitīti, jo Izvešanā tādu pieteikumu nav.</p>` : ''}
+      <p class="hint" style="margin:8px 0 0">${C.PY}. gada dati no ECO Mineral rēķiniem (m³ aprēķināti). Tad katrai mājai bija atsevišķs rēķins, tāpēc ${C.PY}. gada reizes var būt vairāk.</p>
+    </div>`;
+  }
+
   function renderStatsView(){
     if (!state.loaded) return;
+    loadHist();
     state.statsDirty = false;
     const top = document.getElementById('statsTop');
     const allRows = state.tasks.map(t => ({ t, d: parseDate(t.date), k: kindOf(t) })).filter(r => r.d);
@@ -3273,6 +3347,7 @@
     const inPeriod = rows.filter(r => r.d.y === Y && (M === 'all' || r.d.m === +M));
     const P = emptyAgg(); inPeriod.forEach(r => addTo(P, r.t));
     const periodName = M === 'all' ? `${Y}. gadā` : `${MONTHS[+M]} ${Y}`;
+    const CMP = cmpData(allRows, Y, M, SK, hasBulky);
     const avg = P.done ? P.m3 / P.done : 0;
     document.getElementById('pdfPeriod').textContent = '· ' + (M === 'all' ? Y + '. gads' : MONTHS[+M] + ' ' + Y) + ' pa adresēm';
 
@@ -3339,6 +3414,7 @@
           : `<div class="card stat tilt" data-tilt="10"><span class="glare"></span><div class="badge b-pend">${IC.list}</div><div class="k">Pieteikumi</div><div class="v">${P.n}</div></div>`}
         <div class="card stat tilt" data-tilt="10"><span class="glare"></span><div class="badge b-all">${IC.truck.replace(/16/g,'20')}</div><div class="k">Vid. m³ / izved.</div><div class="v">${fmt(avg, 1)}</div></div>
       </div>
+      ${cmpCard(CMP, Y)}
       ${speedCard(inPeriod)}
       ${forecastCard(rows)}
       <div class="card section-card">
@@ -3370,6 +3446,8 @@
       const kk = (o.K || (o.K = {}))[r.k] || (o.K[r.k] = { n:0, done:0, m3:0 });   // pa veidiem: reizes un m³
       kk.n++; if (isDone(r.t)){ kk.done++; kk.m3 += num(r.t.m3Hauled); }
     });
+    state.addrPY = CMP ? { y: CMP.PY, w: wLabel(CMP.w) } : null;
+    if (CMP) Object.entries(A).forEach(([name, o]) => { o.prev = CMP.byA[addrKey(name)] || { n:0, m3:0 }; });
     state.addrRows = Object.entries(A).map(([name, o]) => Object.assign({ name }, o))
       .sort((a,b) => b.m3 - a.m3 || b.n - a.n);
     document.getElementById('addrPeriod').textContent = '· ' + periodName + kindName;
@@ -3648,6 +3726,7 @@
         </div>
         <div class="chips kinds">${KINDS.filter(k => a.K && a.K[k]).map(k => { const x = a.K[k];
           return `<span><i style="--c:${kindDot(k)}"></i>${KIND_NAME[k]}: ${x.done ? `<b>${x.done}×</b>${x.n > x.done ? ' <small>(+' + (x.n - x.done) + ' gaida)</small>' : ''} · <b>${fmt(x.m3, 1)} m³</b>` : `<small>${x.n} gaida</small>`}</span>`; }).join('')}</div>
+        ${a.prev && a.prev.n && state.addrPY ? `<div class="chips prev"><span>${state.addrPY.y} tajā pašā periodā: <b>${fmt(a.prev.m3, 1)} m³</b> · <b>${a.prev.n}×</b></span>${dPct(a.m3, a.prev.m3)}</div>` : ''}
       </div>`).join('');
   }
 
