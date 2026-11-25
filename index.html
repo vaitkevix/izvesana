@@ -2403,7 +2403,7 @@
     box.innerHTML = recent.length ? `<span class="rl">Pēdējās:</span>` + recent.map(a => `<button type="button" class="rc" data-a="${esc(a)}" onclick="addrSet(this.dataset.a)">${esc(a)}</button>`).join('') : '';
   }
   function setupDropdowns(data){
-    state.addresses = data.addresses || [];
+    state.addresses = data.addresses || []; state.combos = null; state.canonC = null;
     state.people = data.people || [];
     state.sia = data.siaList || [];
     state.ai = !!data.ai;
@@ -3317,7 +3317,31 @@
   /* ---- Salīdzinājums ar iepriekšējo gadu (izv_hist: 2025 — ECO Mineral, m³ un reizes). © VAITKEVIX, SIA ---- */
   function addrKey(s){ return String(s || '').replace(/^.*\|\s*/, '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/\b(iela|gatve|bulvaris|prospekts|dambis)\b/g, '').replace(/[^a-z0-9]/g, ''); }
-  const SHOW_HIST = false;   // 2025 salīdzinājums pagaidām izslēgts (dati D1 izv_hist paliek) — lai ieslēgtu, true
+  const SHOW_HIST = true;   // 2025 salīdzinājums (D1 izv_hist no ECO Mineral Excel); false = paslēpt
+  /* Mājas adresē: «Dzelzavas iela 104, 106» → ['DZELZAVAS|104','DZELZAVAS|106'] (apvienoto objektu atpazīšanai) */
+  const H_STOP = /^(IELA|GATVE|BULVARIS|PROSPEKTS|DAMBIS|VNI|J|IR|KK|EE)$/;
+  function housesOf(a){
+    const out = [];
+    String(a || '').replace(/^.*\|\s*/, '').split('/').forEach(seg => {
+      seg = seg.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+      const m = /^\s*(.*?)\s+(\d.*)$/.exec(seg); if (!m) return;
+      const st = (m[1].match(/[A-Z]+/g) || []).filter(w => !H_STOP.test(w)).join('');
+      let base = '';
+      m[2].split(',').forEach(h => { h = h.replace(/[\s-]/g, '');
+        if (/^K\d/.test(h) && base) h = base + h;
+        if (/^\d/.test(h)){ out.push(st + '|' + h); base = (/^\d+[A-Z]?/.exec(h.replace(/K\d+$/, '')) || [''])[0]; } });
+    });
+    return out;
+  }
+  /* Ja adrese (viena māja) ietilpst apvienotajā objektā (Mājas lieta) → apvienotā objekta adrese */
+  function canonAddr(a){
+    const C = state.canonC || (state.canonC = {});
+    if (a in C) return C[a];
+    if (!state.combos) state.combos = state.addresses.map(x => ({ a: x, h: housesOf(x) })).filter(x => x.h.length > 1);
+    const hs = housesOf(a); let best = null;
+    if (hs.length) state.combos.forEach(c => { if (c.h.length > hs.length && hs.every(h => c.h.indexOf(h) >= 0) && (!best || c.h.length > best.h.length)) best = c; });
+    return (C[a] = best ? best.a : a);
+  }
   function loadHist(){
     if (!SHOW_HIST || state.histReq) return; state.histReq = 1;
     google.script.run.withSuccessHandler(h => { state.hist = Array.isArray(h) ? h : []; if (state.hist.length) renderStatsView(); })
@@ -3350,7 +3374,7 @@
     const inTot = k => SK !== 'all' ? k === SK : (k === 'bags' || k === 'branches' || k === 'bio' || (hasBulky && k === 'bulky'));
     const add = (o, k, h) => { const q = o[k] || (o[k] = { n:0, m3:0 }); q.n += h[5]; q.m3 += h[6]; };
     H.forEach(h => { const k = h[4]; if (k[0] === '_' || (SK !== 'all' && k !== SK)) return;
-      const key = addrKey(h[3]), ak = byA[key] || (byA[key] = { n:0, m3:0, K:{}, fy:{ n:0, m3:0 } });
+      const key = addrKey(canonAddr(h[3])), ak = byA[key] || (byA[key] = { n:0, m3:0, K:{}, fy:{ n:0, m3:0 } });
       if (inM(h[1] - 1)){ add(full, k, h); if (inTot(k)){ tf.n += h[5]; tf.m3 += h[6]; } ak.fy.n += h[5]; ak.fy.m3 += h[6]; }
       if (!inW(h[1] - 1, h[2])) return;
       add(prev, k, h); add(ak.K, k, h); ak.n += h[5]; ak.m3 += h[6];
@@ -3372,8 +3396,8 @@
       ${ks.length ? `<table class="tbl cmp-tbl"><thead><tr><th>Veids</th><th>${Y}</th><th>${C.PY}<small>${wLabel(C.w)}</small></th><th>${C.PY}<small>${C.fyName}</small></th></tr></thead><tbody>
         ${ks.map(k => `<tr><td><i class="kd" style="--c:${cmpDot(k)}"></i>${CMP_K[k]}</td><td>${cell(C.cur[k] || z)}</td><td>${cell(C.prev[k] || z)}</td><td>${cell(C.full[k] || z)}</td></tr>`).join('')}
       </tbody></table>` : ''}
-      <p class="hint" style="margin:8px 0 0">Augšā salīdzinātas lapas, zari un bio. Lielgabarīts, jaukti rēķini un citi ${C.PY}. gadā ir tikai tabulā, jo Izvešanā tādu pieteikumu nav.
-        ${C.PY}. gada dati no ECO Mineral rēķiniem, kolonnas kā Excel. Apvienotajiem objektiem mājas saskaitītas kopā.</p>
+      <p class="hint" style="margin:8px 0 0">Augšā salīdzinātas lapas, zari un bio; lielgabarīts ${C.PY}. gadā ir tikai tabulā, jo Izvešanā tādu pieteikumu nav.
+        ${C.PY}. gada dati — ECO Mineral Excel: Lapas ietver arī jauktos rēķinus un viltus izsaukumus, Lielgabarīts — arī būvgružus. Apvienotajiem objektiem mājas saskaitītas kopā.</p>
     </div>`;
   }
 
@@ -3513,17 +3537,19 @@
       </div>`;
 
 
-    const A = {};
+    const A = {};   // pa adresēm: apvienotā objekta mājas un rakstības varianti («Grīvas 9» = «Grīvas iela 9») kopā
     inPeriod.forEach(r => {
-      const k = r.t.address || '—';
-      const o = A[k] || (A[k] = Object.assign(emptyAgg(), { last: r.t.date.split(' ')[0] }));
+      const ca = canonAddr(r.t.address || '—'), k = addrKey(ca) || ca;
+      const o = A[k] || (A[k] = Object.assign(emptyAgg(), { name: ca, last: r.t.date.split(' ')[0], lastN: 0 }));
+      if (ca.length > o.name.length) o.name = ca;
+      const dn = r.d.y * 10000 + r.d.m * 100 + r.d.d; if (dn > o.lastN){ o.lastN = dn; o.last = r.t.date.split(' ')[0]; }
       addTo(o, r.t);
       const kk = (o.K || (o.K = {}))[r.k] || (o.K[r.k] = { n:0, done:0, m3:0 });   // pa veidiem: reizes un m³
       kk.n++; if (isDone(r.t)){ kk.done++; kk.m3 += num(r.t.m3Hauled); }
     });
     state.addrPY = CMP ? { y: CMP.PY, cy: Y, w: wLabel(CMP.w), fy: CMP.fyName } : null;
-    if (CMP) Object.entries(A).forEach(([name, o]) => { o.prev = CMP.byA[addrKey(name)] || { n:0, m3:0, K:{}, fy:{ n:0, m3:0 } }; });
-    state.addrRows = Object.entries(A).map(([name, o]) => Object.assign({ name }, o))
+    if (CMP) Object.entries(A).forEach(([key, o]) => { o.prev = CMP.byA[key] || { n:0, m3:0, K:{}, fy:{ n:0, m3:0 } }; });
+    state.addrRows = Object.values(A)
       .sort((a,b) => b.m3 - a.m3 || b.n - a.n);
     document.getElementById('addrPeriod').textContent = '· ' + periodName + kindName;
     renderAddrList();
