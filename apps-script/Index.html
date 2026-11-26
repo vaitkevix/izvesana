@@ -3610,6 +3610,24 @@
     });
   }
 
+  // Bilžu sīktēli eksportiem (pārlūkā samazina, lai Excel/PDF nav milzīgs). © VAITKEVIX, SIA
+  const TH_ = {};
+  const urlsOf = s => String(s || '').split(/\s+/).filter(u => /^https?:/.test(u));
+  function thumb(url, w){ w = w || 320; const k = url + '|' + w;
+    return TH_[k] || (TH_[k] = (async () => { try {
+      const r = await fetch(url.replace(/([?&]sz=)w\d+/, '$1w600')); if (!r.ok) return null;
+      const bm = await createImageBitmap(await r.blob()), sc = Math.min(1, w / bm.width), c = document.createElement('canvas');
+      c.width = Math.round(bm.width * sc); c.height = Math.round(bm.height * sc); c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
+      return { data: c.toDataURL('image/jpeg', .72), w: c.width, h: c.height, url };
+    } catch(e){ return null; } })()); }
+  async function pool(list, n, fn, onp){ let i = 0, d = 0;
+    await Promise.all(Array.from({ length: Math.min(n, list.length) }, async () => { while (i < list.length){ const k = i++; await fn(list[k], k); if (onp) onp(++d, list.length); } })); }
+  // Atskaites HTML: <img src> → sīktēli (data:), lai drukas PDF ir viegls
+  async function thumbHtml(html, onp){
+    try { const doc = new DOMParser().parseFromString(html, 'text/html'), im = [...doc.querySelectorAll('img.th')];
+      await pool(im, 8, async el => { const t = await thumb(el.getAttribute('src'), 240); if (t) el.setAttribute('src', t.data); }, onp);
+      return '<!DOCTYPE html>' + doc.documentElement.outerHTML; } catch(e){ return html; } }
+
   // sheets: [{ name, title, sub, cols:[{ h, fmt:'int'|'m3'|'date'|'datetime'|'text', wrap, min, max }], rows:[[…]], total:[…]|null, cell(c, ci, row) }]
   async function shXlsx(fileName, docTitle, sheets){
     const ExcelJS = await loadExcelJS();
@@ -3657,14 +3675,20 @@
       // dati
       const line = { bottom:{ style:'thin', color:{ argb:LINE } } };
       S.rows.forEach(r => {
-        const row = ws.addRow(r.map(v => v === '' || v == null ? null : v));
-        if (!S.cols.some((col, i) => col.wrap && String(r[i] || '').length > (col.max || 40))) row.height = 18;   // garam tekstam Excel pats palielina
+        const isImg = v => v && typeof v === 'object' && v.data;
+        const row = ws.addRow(r.map(v => v === '' || v == null || isImg(v) ? null : v));
+        r.forEach((v, i) => { if (!isImg(v)) return;
+          const h = 84, w = Math.min(124, Math.round(v.w / v.h * h));
+          ws.addImage(wb.addImage({ base64: v.data, extension: 'jpeg' }), { tl: { col: i + .08, row: row.number - 1 + .08 }, ext: { width: w, height: h }, editAs: 'oneCell', hyperlinks: { hyperlink: v.url, tooltip: 'Atvērt bildi' } });
+          if (v.n > 1) { row.getCell(i + 1).value = { text: '+' + (v.n - 1), hyperlink: v.url }; } });
+        const hasImg = r.some(isImg);
+        if (hasImg) row.height = 70; else if (!S.cols.some((col, i) => col.wrap && String(r[i] || '').length > (col.max || 40))) row.height = 18;   // garam tekstam Excel pats palielina
         S.cols.forEach((col, i) => {
           const c = row.getCell(i + 1);
           c.font = { name:'Calibri', size:10, color:{ argb:INK } };
           c.border = line;
           if (col.fmt && FMT[col.fmt] && col.fmt !== 'text') c.numFmt = FMT[col.fmt];
-          c.alignment = { vertical: col.wrap ? 'top' : 'middle', wrapText: !!col.wrap, horizontal: (col.fmt === 'int' || col.fmt === 'm3' || col.fmt === 'eur') ? 'right' : 'left' };
+          c.alignment = { vertical: col.wrap || hasImg ? 'top' : 'middle', wrapText: !!col.wrap, horizontal: col.img ? 'right' : (col.fmt === 'int' || col.fmt === 'm3' || col.fmt === 'eur') ? 'right' : 'left' };
           if (S.cell) S.cell(c, i, r);
         });
       });
@@ -3692,7 +3716,7 @@
         let w = String(col.h).length + 3;
         S.rows.concat(S.total ? [S.total] : []).forEach(r => {
           const v = r[i];
-          const len = v == null ? 0 : v instanceof Date ? (col.fmt === 'datetime' ? 16 : 10) : typeof v === 'number' ? String(Math.round(v * 100) / 100).length + 2 : String(v).length;
+          const len = v == null ? 0 : (typeof v === 'object' && v.data) ? 0 : v instanceof Date ? (col.fmt === 'datetime' ? 16 : 10) : typeof v === 'number' ? String(Math.round(v * 100) / 100).length + 2 : String(v).length;
           if (len + 2 > w) w = len + 2;
         });
         ws.getColumn(i + 1).width = Math.max(col.min || 10, Math.min(col.max || 50, w)) + .5;   // ExcelJS izlaiž platumu 9 (noklusējums)
@@ -3735,20 +3759,28 @@
 
     const KN = { bags:'Lapas', branches:'Zari', bio:'Bio', bulky:'Lielgabarīts' };
     const sorted = rows.slice().sort((a, b) => a.d.m - b.d.m || a.d.d - b.d.d || a.t.rowIndex - b.t.rowIndex);
+    // bildes: pirms (pasūtītāja + izvedēja pirms) un pēc — pirmā kā sīktēls, pārējās skaitā
+    sorted.forEach(r => { r.pb = urlsOf(r.t.photoBefore).concat(urlsOf(r.t.photoCarrierBefore)); r.pa = urlsOf(r.t.photoAfter); });
+    const TT = {}, need = [...new Set(sorted.flatMap(r => [r.pb[0], r.pa[0]]).filter(Boolean))];
+    const btn0 = document.getElementById('exportBtn'); btn0.classList.add('busy'); btn0.disabled = true;
+    if (need.length) toast('Gatavo bildes Excel failam (' + need.length + ')…');
+    await pool(need, 8, async u => { TT[u] = await thumb(u, 320); });
+    const ph = arr => arr.length && TT[arr[0]] ? Object.assign({}, TT[arr[0]], { n: arr.length }) : (arr.length ? arr.length + ' bilde(s)' : '');
     const ST = { 'Izpildīts':['FFD6E8E1','FF2F5D45'], 'Atcelts':['FFF3F5F4','FF6D7672'], 'Neizpildīts':['FFF4E4B4','FF6B4A00'] };
     const s2 = {
       name:'Pieteikumi ' + Y, title:'Izvešanas pieteikumi · ' + Y, sub: Y + '. gads · visi pieteikumi pēc datuma',
       cols:[{ h:'Mēnesis', fmt:'text' }, { h:'Datums', fmt:'datetime' }, { h:'ID', fmt:'text' }, { h:'Adrese', fmt:'text', max:44 }, { h:'Pasūtītājs', fmt:'text', max:28 },
         { h:'Veids', fmt:'text' }, { h:'Maisi (apt.)', fmt:'int' }, { h:'Statuss', fmt:'text' }, { h:'Izvest līdz', fmt:'date' }, V('Izvesti m³'),
         { h:'Komentārs', fmt:'text', wrap:true, min:24, max:42 }, { h:'Izvedēja komentārs', fmt:'text', wrap:true, min:24, max:42 }, { h:'Steidzami', fmt:'text' },
-        { h:'Izvedējs (SIA)', fmt:'text', max:28 }, { h:'Izmaksas', fmt:'eur' }, { h:'bez PVN', fmt:'eur' }, { h:'Ar PVN', fmt:'eur' }, { h:'Starpsumma', fmt:'eur' }],
+        { h:'Izvedējs (SIA)', fmt:'text', max:28 }, { h:'Izmaksas', fmt:'eur' }, { h:'bez PVN', fmt:'eur' }, { h:'Ar PVN', fmt:'eur' }, { h:'Starpsumma', fmt:'eur' },
+        { h:'Bilde pirms', fmt:'text', img:true, min:19, max:19 }, { h:'Bilde pēc', fmt:'text', img:true, min:19, max:19 }],
       rows: sorted.map(r => {
         const t = r.t, bags = r.k === 'bags' ? (/^\d+$/.test(String(t.bagsEst).trim()) ? +t.bagsEst : t.bagsEst) : '';
         const due = dueDateOf(t), m3 = isDone(t) && t.m3Hauled !== '' ? r2(num(t.m3Hauled)) : '';
         const c = m3 === '' ? ['', '', '', ''] : [r2(m3 * IZV_RATES.cost), r2(m3 * IZV_RATES.price), r2(m3 * IZV_RATES.price * (1 + IZV_RATES.vat)), r2(m3 * (IZV_RATES.price - IZV_RATES.cost))];
         return [cap(r.d.m), xlDate(t.date), t.id, t.address, t.requester, KN[r.k], bags, t.status,
           due ? new Date(Date.UTC(due.getFullYear(), due.getMonth(), due.getDate())) : '',
-          m3, t.comment, t.carrierComment, t.urgent ? 'Jā' : '', isDone(t) ? t.sia : ''].concat(c);
+          m3, t.comment, t.carrierComment, t.urgent ? 'Jā' : '', isDone(t) ? t.sia : ''].concat(c, [ph(r.pb), ph(r.pa)]);
       }),
       total:null,
       cell(c, i, r){
@@ -3759,7 +3791,7 @@
     };
 
     { const sm = i => r2(s2.rows.reduce((a, r) => a + (typeof r[i] === 'number' ? r[i] : 0), 0));
-      s2.total = ['Kopā ' + Y, '', '', '', '', '', '', '', '', sm(9), '', '', '', '', sm(14), sm(15), sm(16), sm(17)]; }
+      s2.total = ['Kopā ' + Y, '', '', '', '', '', '', '', '', sm(9), '', '', '', '', sm(14), sm(15), sm(16), sm(17), '', '']; }
     const btn = document.getElementById('exportBtn');
     btn.classList.add('busy'); btn.disabled = true;
     try {
@@ -3788,7 +3820,7 @@
       .withSuccessHandler(res => {
         done();
         if (!res || res.status !== 'success') return toast('Kļūda: ' + ((res && res.message) || 'nezināma kļūda'), 'err');
-        if (res.html) { printHtml(res.html); return toast(res.count ? 'Atskaite atvērta — drukā izvēlieties «Saglabāt kā PDF»' : 'Šajā periodā nav izpildītu pieteikumu'); }
+        if (res.html) { lbl.textContent = 'Gatavo bildes…'; btn.classList.add('busy'); thumbHtml(res.html, (d, n) => { lbl.textContent = 'Bildes ' + d + '/' + n; }).then(h => { done(); printHtml(h); }); return toast(res.count ? 'Atskaite atvērta — drukā izvēlieties «Saglabāt kā PDF»' : 'Šajā periodā nav izpildītu pieteikumu'); }
         try {
           const bin = atob(res.b64), u = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
