@@ -1570,6 +1570,10 @@
       </div>
       <button type="submit" id="submitBtn" class="btn btn-primary btn-block">Nosūtīt pieteikumu</button>
     </form>
+    <details class="card section-card" id="regCard" style="margin-top:16px" ontoggle="if(this.open)regLoad()">
+      <summary style="cursor:pointer;font-weight:800;list-style:none">🔁 Regulārie pieteikumi <span class="hint" style="font-weight:600">· izveidojas paši ik N dienas/nedēļas</span></summary>
+      <div id="regBody" style="margin-top:12px"><div class="skel"></div></div>
+    </details>
   </section>
 
   <!-- 2. PIETEIKUMI -->
@@ -2932,7 +2936,7 @@
     try {
       const g = JSON.parse(localStorage.getItem('izvesana_geo_v1') || '{}');
       state.geo.coords = g.coords || {};
-      state.carrierSort = ['near','new','map'].includes(g.sort) ? g.sort : 'near';
+      state.carrierSort = ['near','new','map','route'].includes(g.sort) ? g.sort : 'near';
     } catch(e){}
   }
   function saveGeo(){
@@ -3078,6 +3082,7 @@
     bar.innerHTML = `<div class="seg sort-seg">
         <button type="button" class="${mode === 'near' ? 'on' : ''}" title="Tuvākās" aria-label="Tuvākās" onclick="setCarrierSort('near')">${IC.pin} <span>Tuvākās</span></button>
         <button type="button" class="${mode === 'new' ? 'on' : ''}" title="Jaunākās" aria-label="Jaunākās" onclick="setCarrierSort('new')">${IC.clockSm} <span>Jaunākās</span></button>
+        <button type="button" class="${mode === 'route' ? 'on' : ''}" title="Maršruts" aria-label="Maršruts" onclick="state.routeI=0;setCarrierSort('route')">${IC.truck} <span>Maršruts</span></button>
         <button type="button" class="${mode === 'map' ? 'on' : ''}" title="Karte" aria-label="Karte" onclick="setCarrierSort('map')">${IC.mapIc} <span>Karte</span></button>
       </div>`;
     if (info) info.innerHTML = msg ? `<div class="sort-info">${msg}</div>` : '';
@@ -4012,6 +4017,7 @@
     pending.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || (near
       ? ((km[a.id] == null ? 1e9 : km[a.id]) - (km[b.id] == null ? 1e9 : km[b.id]))
       : b.rowIndex - a.rowIndex));
+    if (state.carrierSort === 'route') pending = routeOrder(pending);
     if (!allPending.length){
       box.innerHTML = emptyState(IC.leafBig, 'Viss izvests!', 'Šobrīd nav neviena neizpildīta pieteikuma.') + carrierDoneHtml();
       renderSortBar();
@@ -4032,7 +4038,7 @@
         ${soon.slice(0, 8).map(t => `<button type="button" class="due-row" data-id="${esc(t.id)}" onclick="jumpToTask(this.dataset.id)"><span>${esc(t.address)}</span>${dueTag(t)}</button>`).join('')}
         ${soon.length > 8 ? `<div class="hint" style="margin-top:6px">… un vēl ${soon.length - 8}</div>` : ''}
       </div>` : '';
-    box.innerHTML = dayCardHtml() + banner + '<div class="list">' + pending.map((t, i) => {
+    box.innerHTML = dayCardHtml() + (state.carrierSort === 'route' ? routeCard(pending) : '') + banner + '<div class="list">' + pending.map((t, i) => {
       const r = t.rowIndex;
       return `
       <article class="card task ${t.urgent ? 'is-urgent' : ''} ${i < 8 ? 'anim' : ''}" data-id="${esc(t.id)}" ${i < 8 ? `style="animation-delay:${i * 20}ms"` : ''}>
@@ -4042,7 +4048,7 @@
             <div class="sub">Pieteikts ${agoTxt(t.date)}</div>
             ${tagsHtml(t)}
           </div>
-          ${km[t.id] != null ? `<span class="km-pill">${IC.pin} ${km[t.id] < 0.1 ? '&lt;0,1' : '~' + fmt(km[t.id], km[t.id] < 10 ? 1 : 0)} km</span>` : ''}
+          ${state.carrierSort === 'route' ? `<span class="km-pill">Nr. ${i + 1}</span>` : km[t.id] != null ? `<span class="km-pill">${IC.pin} ${km[t.id] < 0.1 ? '&lt;0,1' : '~' + fmt(km[t.id], km[t.id] < 10 ? 1 : 0)} km</span>` : ''}
         </div>
         <div class="meta">
           ${metaItem(IC.user, 'Pasūtītājs', t.requester)}
@@ -4417,6 +4423,67 @@
       msg => { toast(msg, 'err'); renderStatsView(); });
   }
 
+  /* ---------- Regulārie pieteikumi (Worker izv_reg; cron izveido pieteikumu) ---------- */
+  function regLoad(){
+    google.script.run.withSuccessHandler(r => regDraw(r)).withFailureHandler(e => { document.getElementById('regBody').innerHTML = '<p class="hint">' + esc(e.message) + '</p>'; }).regList();
+  }
+  function regDraw(r){
+    const b = document.getElementById('regBody'); if (!b) return;
+    if (!r || r.status !== 'success'){ b.innerHTML = '<p class="hint">' + esc((r && r.message) || 'Nav pieejams') + '</p>'; return; }
+    state.reg = r.list || [];
+    const ikTxt = (n) => n % 7 === 0 ? (n / 7 === 1 ? 'katru nedēļu' : 'ik ' + n / 7 + ' ned.') : 'ik ' + n + ' d.';
+    const opts = state.addresses.map(a => '<option value="' + esc(a) + '">').join('');
+    b.innerHTML = (state.reg.length ? '<div class="list">' + state.reg.map(x => `<div class="reg-row" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line,#e5e7eb)">
+        <div style="min-width:0"><b style="display:block;overflow-wrap:anywhere">${esc(x.adrese)}</b><small class="hint">${ikTxt(x.ik)} · nākamais ${esc(x.nakamais.split('-').reverse().join('.'))}${x.komentars ? ' · ' + esc(x.komentars) : ''}${x.aktivs ? '' : ' · <b>apturēts</b>'}</small></div>
+        <span style="display:flex;gap:6px;flex:none"><button type="button" class="chip-link ghost" data-id="${esc(x.id)}" onclick="regEdit(this.dataset.id)">${IC.edit}</button>
+        <button type="button" class="chip-link ghost" data-id="${esc(x.id)}" onclick="regToggle(this.dataset.id)">${x.aktivs ? 'Apturēt' : 'Ieslēgt'}</button></span></div>`).join('') + '</div>' : '<p class="hint">Vēl nav neviena. Piem., adresei katru otro nedēļu izvest lapas.</p>')
+      + `<div id="regForm" style="margin-top:14px"><input type="hidden" id="rg_id">
+        <div class="field"><label class="label" for="rg_addr">Adrese</label><input class="input" id="rg_addr" list="rg_addrs" autocomplete="off" placeholder="Sāciet rakstīt adresi"><datalist id="rg_addrs">${opts}</datalist></div>
+        <div class="field" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"><div style="flex:1;min-width:110px"><label class="label" for="rg_n">Ik</label><input class="input" id="rg_n" type="number" min="1" max="52" value="2"></div>
+          <div style="flex:1;min-width:120px"><select class="select" id="rg_u"><option value="7">nedēļas</option><option value="1">dienas</option></select></div>
+          <div style="flex:1;min-width:140px"><label class="label" for="rg_next">Nākamais</label><input class="input" id="rg_next" type="date"></div></div>
+        <div class="field"><label class="label" for="rg_kom">Komentārs <span class="opt">· nav obligāti</span></label><input class="input" id="rg_kom" placeholder="Piem., lapu maisi pie vārtiem"></div>
+        <button type="button" class="btn btn-primary btn-block" id="rg_save" onclick="regSave()">Saglabāt regulāro pieteikumu</button></div>`;
+  }
+  function regEdit(id){
+    const x = (state.reg || []).find(r => r.id === id); if (!x) return;
+    const w = x.ik % 7 === 0; document.getElementById('rg_id').value = x.id; document.getElementById('rg_addr').value = x.adrese;
+    document.getElementById('rg_n').value = w ? x.ik / 7 : x.ik; document.getElementById('rg_u').value = w ? '7' : '1';
+    document.getElementById('rg_next').value = x.nakamais; document.getElementById('rg_kom').value = x.komentars || '';
+    document.getElementById('regForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  function regSave(){
+    const g = (i) => document.getElementById(i).value, id = g('rg_id'), old = (state.reg || []).find(r => r.id === id);
+    const d = { id, adrese: g('rg_addr').trim(), ik: (+g('rg_n') || 0) * (+g('rg_u') || 1), nakamais: g('rg_next'), komentars: g('rg_kom').trim(), aktivs: old ? old.aktivs : 1 };
+    if (!d.adrese) return toast('Norādiet adresi', 'err');
+    const btn = document.getElementById('rg_save'); btn.disabled = true;
+    google.script.run.withSuccessHandler(r => { if (r && r.status === 'success'){ toast('Saglabāts', 'ok'); regDraw(r); } else { btn.disabled = false; toast((r && r.message) || 'Kļūda', 'err'); } })
+      .withFailureHandler(e => { btn.disabled = false; toast(e.message, 'err'); }).regSave(d);
+  }
+  function regToggle(id){
+    const x = (state.reg || []).find(r => r.id === id); if (!x) return;
+    google.script.run.withSuccessHandler(r => { if (r && r.status === 'success') regDraw(r); else toast((r && r.message) || 'Kļūda', 'err'); })
+      .withFailureHandler(e => toast(e.message, 'err')).regSave(Object.assign({}, x, { aktivs: x.aktivs ? 0 : 1 }));
+  }
+  /* ---------- Dienas maršruts: tuvākais kaimiņš no atrašanās vietas (vai bāzes) ---------- */
+  function routeOrder(list){
+    const G = state.geo, o = originLL(); let cur = o ? o.ll : null;
+    const have = list.filter(t => G.coords[cleanAddr(t.address)]), miss = list.filter(t => !G.coords[cleanAddr(t.address)]), out = [];
+    if (!cur && have.length) cur = G.coords[cleanAddr(have[0].address)];
+    const left = have.slice();
+    while (left.length){ let bi = 0, bd = 1e9; left.forEach((t, i) => { const d = distKm(cur, G.coords[cleanAddr(t.address)]); if (d < bd){ bd = d; bi = i; } });
+      const t = left.splice(bi, 1)[0]; t._leg = bd; out.push(t); cur = G.coords[cleanAddr(t.address)]; }
+    return out.concat(miss);
+  }
+  function routeCard(order){
+    if (!order.length) return '';
+    const i = Math.min(state.routeI || 0, order.length - 1), t = order[i], km = order.reduce((s, x) => s + (x._leg && x._leg < 1e8 ? x._leg : 0), 0);
+    return `<div class="card section-card route-card"><h4>${IC.pin} Dienas maršruts · ${order.length} adreses · ~${fmt(km * 1.3, 0)} km</h4>
+      <p class="hint" style="margin:0 0 8px">Nr. ${i + 1}: <b>${esc(t.address)}</b></p>
+      <div class="links"><a class="chip-link waze" href="${wazeUrl(t.address)}" target="_blank">${IC.waze} Waze</a>
+        <button type="button" class="chip-link" data-id="${esc(t.id)}" onclick="jumpToTask(this.dataset.id)">${IC.check} Atvērt</button>
+        <button type="button" class="chip-link ghost" onclick="state.routeI=${(i + 1) % order.length};renderCarrierList()">Nākamais →</button></div></div>`;
+  }
   function speedCard(inPeriod){
     const hrs = inPeriod.map(r => r.t).filter(t => isDone(t) && t.doneAt).map(t => {
       const a = parseDT(t.date), b = parseDT(t.doneAt);
@@ -4434,7 +4501,18 @@
         <div><b>${fmtH(avgH)}</b><small>vidēji</small></div>
         <div><b>${fmtH(med)}</b><small>mediāna</small></div>
         <div><b>${inTime}%</b><small>7 dienās</small></div>
-      </div></div>`;
+      </div>${speedBreak(inPeriod, fmtH)}</div>`;
+  }
+  /* Reakcijas laiks pa izvedējiem un mēnešiem (pieteikts → izvests, vidēji) */
+  function speedBreak(inPeriod, fmtH){
+    const S = {}, M = {};
+    inPeriod.map(r => r.t).filter(t => isDone(t) && t.doneAt).forEach(t => { const a = parseDT(t.date), b = parseDT(t.doneAt); if (!a || !b || b < a) return; const h = (b - a) / 36e5;
+      const k = t.sia || '—'; (S[k] = S[k] || []).push(h); const m = MONTHS[a.getMonth()] + ' ' + a.getFullYear(); (M[m] = M[m] || { h: [], o: a.getFullYear() * 12 + a.getMonth() }).h.push(h); });
+    const av = (L) => L.reduce((s, h) => s + h, 0) / L.length;
+    const rows = (o) => o.map(([k, L]) => `<tr><td>${esc(k)}</td><td>${L.length}</td><td class="m3">${fmtH(av(L))}</td></tr>`).join('');
+    if (!Object.keys(S).length) return '';
+    return `<div class="tbl-wrap" style="margin-top:12px"><table class="tbl"><thead><tr><th>Izvedējs</th><th>Izved.</th><th>Vidēji</th></tr></thead><tbody>${rows(Object.entries(S).sort((a, b) => av(a[1]) - av(b[1])))}</tbody></table></div>`
+      + (Object.keys(M).length > 1 ? `<div class="tbl-wrap" style="margin-top:10px"><table class="tbl"><thead><tr><th>Mēnesis</th><th>Izved.</th><th>Vidēji</th></tr></thead><tbody>${rows(Object.entries(M).sort((a, b) => a[1].o - b[1].o).map(([k, v]) => [k, v.h]))}</tbody></table></div>` : '');
   }
   function parseDT(s){
     const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/.exec(String(s || '').trim());
