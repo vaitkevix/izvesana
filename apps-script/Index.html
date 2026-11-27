@@ -2269,6 +2269,7 @@
     if (!state.pin) try {   // ienācis portālā (izvedēja SIA vai administrators) → parole nav jāievada
       if (portalT()){ const tb = document.querySelector('.tab[data-tab="carrier"]'); if (tb) tb.style.display = 'none'; }   // portāla cilvēkam bez izvedēja tiesībām cilne nav vajadzīga
       google.script.run.withSuccessHandler(r => {
+        if (r && r.name){ state.siaMode = !!r.sia; }   // SIA (vai tās darbinieks) — pogas «Pieņemu / Nevaru»
         if (r && r.name && !state.unlocked){ state.unlocked = true; state.pin = r.name + '\n*'; state.viaPortal = true; renderCarrierList(); renderTaskList(); }
         if (r && r.name){ const tb = document.querySelector('.tab[data-tab="carrier"]'); if (tb){ tb.style.display = ''; moveTabInd(); } }
       }).portalCarrier();
@@ -2797,6 +2798,8 @@
       else out.push(`<span class="tag ${left <= 1 ? 'w2' : ''}">${IC.clockSm} Līdz ${dueText(t)}${w >= 1 ? ' · gaida ' + w + ' ' + dWord(w) : ''}</span>`);
     }
     if (t.problem) out.push(`<span class="tag w2">${IC.alertSm} Nevarēja izvest</span>`);
+    if (t.accepted) out.push(`<span class="tag">✓ Pieņemts · ${esc(String(t.accepted).split(' · ')[0])}</span>`);
+    else if (t.declined) out.push(`<span class="tag w2">${IC.alertSm} Izvedējs nevar šajā datumā</span>`);
     return out.length ? `<div class="tags">${out.join('')}</div>` : '';
   }
   function accessHtml(t){
@@ -2827,6 +2830,24 @@
         .withFailureHandler(() => { state.accessBusy = false; })
         .getAccess(state.pin);
     } catch(e){ state.accessBusy = false; state.access = {}; }
+  }
+  /* SIA: «Pieņemu» / «Nevaru šajā datumā» (Worker carrierAnswer; vadītājs saņem paziņojumu, ja nevar) */
+  function acceptHtml(t){
+    if (isDone(t) || isCancelled(t)) return '';
+    const dec = t.declined ? /^(.*?) · (\d\d\.\d\d\.\d{4} \d\d:\d\d) · ([\s\S]*)$/.exec(t.declined) : null;
+    const info = t.declined ? `<div class="prob-note"><b>Nevar šajā datumā${dec ? ' · ' + esc(dec[1]) + ' · ' + esc(dec[2]) : ''}</b>${esc(dec ? dec[3] : t.declined)}</div>` : '';
+    if (!state.siaMode) return info;
+    const id = esc(t.id);
+    return info + `<div class="links" style="margin-top:8px">${t.accepted ? `<span class="tag">✓ Pieņemts ${esc(String(t.accepted).split(' · ').slice(1).join(' · '))}</span>` : `<button type="button" class="btn btn-primary" data-id="${id}" onclick="carrierAnswer(this.dataset.id, true)">Pieņemu</button>`}
+      <button type="button" class="btn" data-id="${id}" onclick="carrierAnswer(this.dataset.id, false)">Nevaru šajā datumā</button></div>`;
+  }
+  function carrierAnswer(id, ok){
+    let reason = '';
+    if (!ok){ reason = (window.prompt('Kāpēc nevarat šajā datumā? (vadītājs saņems paziņojumu)', '') || '').trim(); if (!reason) return; }
+    google.script.run
+      .withSuccessHandler(res => { if (res && res.status === 'success'){ toast(ok ? 'Pieņemts ✓' : 'Vadītājam paziņots', 'ok'); useTasks(res); } else toast('Kļūda: ' + ((res && res.message) || 'nezināma kļūda'), 'err'); })
+      .withFailureHandler(err => toast('Kļūda: ' + err.message, 'err'))
+      .carrierAnswer({ id: id, ok: !!ok, reason: reason.slice(0, 200) });
   }
   function problemHtml(t){
     if (!t.problem || isDone(t) || isCancelled(t)) return '';
@@ -3986,6 +4007,7 @@
         ${t.comment ? `<div class="note">${esc(t.comment)}</div>` : ''}
         ${accessHtml(t)}
         ${problemHtml(t)}
+        ${acceptHtml(t)}
         ${thumbsHtml(t.photoBefore, 'Bilde pirms', t.id, 'before')}
         <div class="links">
           <a class="chip-link nav-main" href="${navUrl(t.address)}" target="_blank">${IC.pin} Navigēt</a>
